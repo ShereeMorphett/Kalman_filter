@@ -5,9 +5,8 @@ project(
     meson_version: '>=1.0.0',
     default_options: [ 'b_ndebug=if-release', 'buildtype=debug', 'cpp_std=c++14', 'default_library=static']
 )
-# Include directories
-include_directories = include_directories('include')
+
+eigen_dependency = dependency('eigen', fallback: ['eigen', 'eigen_dep'])
 
 # Add subdirectories
 subdir('src')
-subdir('tests')
