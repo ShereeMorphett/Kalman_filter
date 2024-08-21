@@ -35,7 +35,6 @@ jobs:
       run: |
           sudo apt -y update
           sudo -H pip3 install --no-cache-dir --upgrade meson
-          meson wrap install eigen
 
     - name: Install lld
       if: ${{ startsWith(matrix.linker, 'lld')  }}
@@ -63,7 +62,8 @@ jobs:
 
     - name: Configure Meson
       run: |
-          CC=cc CXX=c++ CXX_LD=${{ matrix.linker }} meson setup build --buildtype=${{ matrix.type }}
+          CC=cc CXX=c++ CXX_LD=${{ matrix.linker }} meson setup build --buildtype=${{ matrix.type }} &&
+          meson wrap install eigen
 
     - name: Build
       run: meson compile -C build --jobs -1
