@@ -35,7 +35,6 @@ jobs:
       run: |
           sudo apt -y update
           sudo -H pip3 install --no-cache-dir --upgrade meson
-          sudo apt-get -y install ninja-build
 
     - name: Install lld
       if: ${{ startsWith(matrix.linker, 'lld')  }}
