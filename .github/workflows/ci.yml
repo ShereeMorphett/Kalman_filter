@@ -36,6 +36,15 @@ jobs:
           sudo apt -y update
           sudo -H pip3 install --no-cache-dir --upgrade meson
 
+    - name: Update Ninja
+      run: |
+        curl -L https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-linux.zip -o ninja-linux.zip
+        sudo apt-get install unzip
+        unzip ninja-linux.zip -d ninja
+        sudo mv ninja/ninja /usr/bin/ninja
+        sudo chmod +x /usr/bin/ninja
+        ninja --version
+
     - name: Install lld
       if: ${{ startsWith(matrix.linker, 'lld')  }}
       run: |
