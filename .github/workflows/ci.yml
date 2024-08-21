@@ -25,16 +25,17 @@ jobs:
           - "debug"
           - "release"
 
-    runs-on : ubuntu-latest
+    runs-on: ubuntu-latest
 
     defaults:
-        run:
-          shell: bash
+      run:
+        shell: bash
+
     steps:
     - name: Install base dependencies
       run: |
-          sudo apt -y update
-          sudo -H pip3 install --no-cache-dir --upgrade meson
+        sudo apt -y update
+        sudo -H pip3 install --no-cache-dir --upgrade meson
 
     - name: Update Ninja
       run: |
@@ -46,33 +47,36 @@ jobs:
         ninja --version
 
     - name: Install lld
-      if: ${{ startsWith(matrix.linker, 'lld')  }}
+      if: ${{ startsWith(matrix.linker, 'lld') }}
       run: |
-          sudo apt -y install --no-install-recommends lld-${{ env.clang_version }}
-          sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-${{ env.clang_version }} 1000
+        sudo apt -y install --no-install-recommends lld-${{ env.clang_version }}
+        sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-${{ env.clang_version }} 1000
 
     - name: Install clang
-      if: ${{ startsWith(matrix.compiler, 'clang')  }}
+      if: ${{ startsWith(matrix.compilers, 'clang') }}
       run: |
-          sudo apt -y install --no-install-recommends clang-${{ env.clang_version }}
-          sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-${{ env.clang_version }} 1000
-          sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-${{ env.clang_version }} 1000
+        sudo apt -y install --no-install-recommends clang-${{ env.clang_version }}
+        sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-${{ env.clang_version }} 1000
+        sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-${{ env.clang_version }} 1000
 
     - name: Install gcc
-      if: ${{ startsWith(matrix.compiler, 'gcc') }}
+      if: ${{ startsWith(matrix.compilers, 'gcc') }}
       run: |
-          sudo apt -y install --no-install-recommends gcc-${{ env.gcc_version }} g++-${{ env.gcc_version }}
-          sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-${{ env.gcc_version }} 1000
-          sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-${{ env.gcc_version }} 1000
+        sudo apt -y install --no-install-recommends gcc-${{ env.gcc_version }} g++-${{ env.gcc_version }}
+        sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-${{ env.gcc_version }} 1000
+        sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-${{ env.gcc_version }} 1000
 
     - uses: actions/checkout@v3
       with:
-          submodules: true
+        submodules: true
+
+    - name: Clean build directory
+      run: rm -rf build
 
     - name: Configure Meson
       run: |
-          CC=cc CXX=c++ CXX_LD=${{ matrix.linker }} meson setup build --buildtype=${{ matrix.type }} &&
-          meson wrap install eigen
+        CC=cc CXX=c++ CXX_LD=${{ matrix.linker }} meson setup build --buildtype=${{ matrix.type }} --verbose &&
+        meson wrap install eigen
 
     - name: Build
       run: meson compile -C build --jobs -1
