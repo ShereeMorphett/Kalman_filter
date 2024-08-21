@@ -5,7 +5,6 @@ on:
         paths:
             - "**.hpp"
             - "**.cpp"
-            - "**/src"
             - "**/meson.build"
             - "**/workflows/ci.yaml"
     workflow_dispatch:
@@ -44,13 +43,12 @@ jobs:
             - name: Install dependencies
               run: |
                   sudo -H pip3 install --no-cache-dir --upgrade ninja meson --break-system-packages
-              working-directory: ./src
+              
 
             - name: Install lld
               if: ${{ startsWith(matrix.linker, 'lld')  }}
               run: |
                   sudo apt -y install --no-install-recommends lld
-              working-directory: ./src
 
             - name: Workaround for Clang on Ubuntu
               if: ${{ startsWith(matrix.compiler.cxx, 'clang') && matrix.os == 'ubuntu-22.04' }}
@@ -58,16 +56,16 @@ jobs:
                   sudo rm -f /etc/apt/sources.list.d/ubuntu-toolchain-r-ubuntu-test-jammy.list
                   sudo apt-get update
                   sudo apt-get install -y --allow-downgrades libc6=2.35-0ubuntu3.5 libc6-dev=2.35-0ubuntu3.5 libstdc++6=12.3.0-1ubuntu1~22.04 libgcc-s1=12.3.0-1ubuntu1~22.04
-              working-directory: ./src
+              
 
             - name: Configure
               run: |
                   CC=${{ matrix.compiler.cc }} CXX=${{ matrix.compiler.cxx }} CXX_LD=${{ matrix.linker }} meson setup build
-              working-directory: ./src
+              
 
             - name: Build
               run: meson compile -C build --jobs -1
-              working-directory: ./src
+              
 
     windows:
         strategy:
@@ -93,14 +91,14 @@ jobs:
             - name: Install dependencies
               run: |
                   pip install --no-cache-dir --upgrade ninja meson
-              working-directory: ./src
+              
 
             - name: Configure
               run: |
                   meson setup build --vsenv --buildtype=${{ matrix.type }}
-              working-directory: ./src
+              
 
             - name: Build
               run: |
                   meson compile -C build --jobs -1
-              working-directory: ./src
+              
