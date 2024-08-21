@@ -75,7 +75,7 @@ jobs:
 
     - name: Configure Meson
       run: |
-        CC=cc CXX=c++ CXX_LD=${{ matrix.linker }} meson setup build --buildtype=${{ matrix.type }} --verbose &&
+        CC=cc CXX=c++ CXX_LD=${{ matrix.linker }} meson setup build --buildtype=${{ matrix.type }} --log-level=debug &&
         meson wrap install eigen
 
     - name: Build
