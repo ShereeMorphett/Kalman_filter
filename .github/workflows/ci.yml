@@ -8,7 +8,6 @@ on:
       - "**/meson.build"
       - "**/ci.yml"
   workflow_dispatch:
-
 env:
     clang_version: "15"
     gcc_version: "12"
@@ -36,6 +35,7 @@ jobs:
       run: |
           sudo apt -y update
           sudo -H pip3 install --no-cache-dir --upgrade meson
+          meson wrap install eigen
 
     - name: Install lld
       if: ${{ startsWith(matrix.linker, 'lld')  }}
