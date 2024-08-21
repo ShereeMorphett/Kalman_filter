@@ -1,85 +1,106 @@
 name: ci
 
 on:
-  push:
-    paths:
-      - "**.hpp"
-      - "**.cpp"
-      - "**/meson.build"
-      - "**/ci.yml"
-  workflow_dispatch:
-env:
-    clang_version: "15"
-    gcc_version: "12"
+    push:
+        paths:
+            - "**.hpp"
+            - "**.cpp"
+            - "**/src"
+            - "**/meson.build"
+            - "**/workflows/ci.yaml"
+    workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  linux:
-    strategy:
-      matrix:
-        compilers:
-          - "clang"
-          - "gcc"
-        linker:
-          - "lld"
-        type:
-          - "debug"
-          - "release"
+    linux:
+        strategy:
+            matrix:
+                os:
+                    - "ubuntu-24.04"
+                compiler:
+                    - cxx: "clang++"
+                      cc: "clang"
+                linker:
+                    - "lld"
+                type:
+                    - "debug"
+                    - "release"
 
-    runs-on: ubuntu-latest
+        runs-on: "${{ matrix.os }}"
 
-    defaults:
-      run:
-        shell: bash
+        defaults:
+            run:
+                shell: bash
 
-    steps:
-    - name: Install base dependencies
-      run: |
-        sudo apt -y update
-        sudo -H pip3 install --no-cache-dir --upgrade meson
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
-    - name: Update Ninja
-      run: |
-        curl -L https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-linux.zip -o ninja-linux.zip
-        sudo apt-get install unzip
-        unzip ninja-linux.zip -d ninja
-        sudo mv ninja/ninja /usr/bin/ninja
-        sudo chmod +x /usr/bin/ninja
-        ninja --version
+            - name: Install dependencies
+              run: |
+                  sudo -H pip3 install --no-cache-dir --upgrade ninja meson --break-system-packages
+              working-directory: ./src
 
-    - name: Install lld
-      if: ${{ startsWith(matrix.linker, 'lld') }}
-      run: |
-        sudo apt -y install --no-install-recommends lld-${{ env.clang_version }}
-        sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-${{ env.clang_version }} 1000
+            - name: Install lld
+              if: ${{ startsWith(matrix.linker, 'lld')  }}
+              run: |
+                  sudo apt -y install --no-install-recommends lld
+              working-directory: ./src
 
-    - name: Install clang
-      if: ${{ startsWith(matrix.compilers, 'clang') }}
-      run: |
-        sudo apt -y install --no-install-recommends clang-${{ env.clang_version }}
-        sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-${{ env.clang_version }} 1000
-        sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-${{ env.clang_version }} 1000
+            - name: Workaround for Clang on Ubuntu
+              if: ${{ startsWith(matrix.compiler.cxx, 'clang') && matrix.os == 'ubuntu-22.04' }}
+              run: |
+                  sudo rm -f /etc/apt/sources.list.d/ubuntu-toolchain-r-ubuntu-test-jammy.list
+                  sudo apt-get update
+                  sudo apt-get install -y --allow-downgrades libc6=2.35-0ubuntu3.5 libc6-dev=2.35-0ubuntu3.5 libstdc++6=12.3.0-1ubuntu1~22.04 libgcc-s1=12.3.0-1ubuntu1~22.04
+              working-directory: ./src
 
-    - name: Install gcc
-      if: ${{ startsWith(matrix.compilers, 'gcc') }}
-      run: |
-        sudo apt -y install --no-install-recommends gcc-${{ env.gcc_version }} g++-${{ env.gcc_version }}
-        sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-${{ env.gcc_version }} 1000
-        sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-${{ env.gcc_version }} 1000
+            - name: Configure
+              run: |
+                  CC=${{ matrix.compiler.cc }} CXX=${{ matrix.compiler.cxx }} CXX_LD=${{ matrix.linker }} meson setup build
+              working-directory: ./src
 
-    - uses: actions/checkout@v3
-      with:
-        submodules: true
+            - name: Build
+              run: meson compile -C build --jobs -1
+              working-directory: ./src
 
-    - name: Clean build directory
-      run: rm -rf build
+    windows:
+        strategy:
+            matrix:
+                type:
+                    - "debug"
+                    - "release"
 
-    - name: Configure Meson
-      run: |
-        CC=cc CXX=c++ CXX_LD=${{ matrix.linker }} meson setup build --buildtype=${{ matrix.type }} --log-level=debug &&
-        meson wrap install eigen
+        runs-on: windows-latest
 
-    - name: Build
-      run: meson compile -C build --jobs -1
+        defaults:
+            run:
+                shell: cmd
 
-    - name: Test
-      run: meson test -C build --verbose
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - uses: ilammy/msvc-dev-cmd@v1
+
+            - name: Install dependencies
+              run: |
+                  pip install --no-cache-dir --upgrade ninja meson
+              working-directory: ./src
+
+            - name: Configure
+              run: |
+                  meson setup build --vsenv --buildtype=${{ matrix.type }}
+              working-directory: ./src
+
+            - name: Build
+              run: |
+                  meson compile -C build --jobs -1
+              working-directory: ./src
