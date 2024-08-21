@@ -49,6 +49,9 @@ jobs:
           sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-${{ env.clang_version }} 1000
           sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-${{ env.clang_version }} 1000
 
+    - name: Install Ninja
+      run: |
+        sudo apt-get -y install ninja-build
     - name: Install gcc
       if: ${{ startsWith(matrix.compiler, 'gcc') }}
       run: |
