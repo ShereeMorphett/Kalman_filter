@@ -12,7 +12,7 @@
 class UDPClient
 {
     private:
-        int sockfd;
+        int sock_fd;
         char buffer[MAXLINE];
         struct sockaddr_in servaddr;
         socklen_t len;
@@ -21,9 +21,9 @@ class UDPClient
         UDPClient();
         ~UDPClient();
 
-        void sendHandshake();
-        void receiveInitialization();
-        void sendEstimation(const std::string& estimation);
-        void processLoop();
+        void send_handshake();
+        void receive_initialization();
+        void send_estimation(const std::string& estimation);
+        void process_loop();
 
 };

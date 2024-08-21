@@ -2,9 +2,9 @@
 #include "UDPclient.hpp"
 
 
-UDPClient::UDPClient() : sockfd(socket(AF_INET, SOCK_DGRAM, 0)), len(sizeof(servaddr))
+UDPClient::UDPClient() : sock_fd(socket(AF_INET, SOCK_DGRAM, 0)), len(sizeof(servaddr))
 {
-    if (sockfd < 0) {
+    if (sock_fd < 0) {
         perror("socket creation failed");
         exit(EXIT_FAILURE);
     }
@@ -17,20 +17,20 @@ UDPClient::UDPClient() : sockfd(socket(AF_INET, SOCK_DGRAM, 0)), len(sizeof(serv
 
 UDPClient::~UDPClient()
 {
-    close(sockfd);
+    close(sock_fd);
 }
 
-void UDPClient::sendHandshake()
+void UDPClient::send_handshake()
 {
     const std::string handshake = "READY";
-    sendto(sockfd, handshake.c_str(), handshake.length(), MSG_CONFIRM, 
+    sendto(sock_fd, handshake.c_str(), handshake.length(), MSG_CONFIRM, 
            reinterpret_cast<const struct sockaddr*>(&servaddr), sizeof(servaddr));
-    std::cout << "Handshake message sent." << std::endl;
+    std::cout << "Client: Handshake message sent." << std::endl;
 }
 
-void UDPClient::receiveInitialization()
+void UDPClient::receive_initialization()
 {
-    int buff_len = recvfrom(sockfd, buffer, MAXLINE, MSG_WAITALL, 
+    int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL, 
                             reinterpret_cast<struct sockaddr*>(&servaddr), &len);
     buffer[buff_len] = '\0';
     std::cout << "Server: " << buffer << std::endl;
@@ -38,17 +38,17 @@ void UDPClient::receiveInitialization()
     // Initialize filter here with the data in buffer
 }
 
-void UDPClient::sendEstimation(const std::string& estimation)
+void UDPClient::send_estimation(const std::string& estimation)
 {
-    sendto(sockfd, estimation.c_str(), estimation.length(), MSG_CONFIRM, 
+    sendto(sock_fd, estimation.c_str(), estimation.length(), MSG_CONFIRM, 
            reinterpret_cast<const struct sockaddr*>(&servaddr), sizeof(servaddr));
-    std::cout << "Position estimation sent." << std::endl;
+    std::cout << "Client: Position estimation sent." << std::endl;
 }
 
-void UDPClient::processLoop()
+void UDPClient::process_loop()
 {
     while (true) {
-        int buff_len = recvfrom(sockfd, buffer, MAXLINE, MSG_WAITALL, 
+        int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL, 
                                 reinterpret_cast<struct sockaddr*>(&servaddr), &len);
         buffer[buff_len] = '\0';
         std::cout << "Server: " << buffer << std::endl;
@@ -56,6 +56,6 @@ void UDPClient::processLoop()
         // Update your Kalman filter with the new data in buffer
         // Calculate and send the new estimation
         const std::string new_estimation = "1.7325073314060224 -2.2213777837034083 0.49999962025821726"; // Example
-        sendEstimation(new_estimation);
+        send_estimation(new_estimation);
     }
 }

@@ -1,7 +1,7 @@
 
 #include <iostream>
 #include <unistd.h>
-#include <Eigen> //may only need the dense
+#include <Eigen/Dense> //may only need the dense
 #include "UDPclient.hpp"
 
 /*
@@ -63,13 +63,13 @@ OPTIONS:
 int main() {
     std::unique_ptr<UDPClient> client = std::make_unique<UDPClient>();
 
-    client->sendHandshake();
-    client->receiveInitialization();
+    client->send_handshake();
+    client->receive_initialization();
 
     const std::string initial_estimation = "1.7325073314060224 -2.2213777837034083 0.49999962025821726";
-    client->sendEstimation(initial_estimation);
+    client->send_estimation(initial_estimation);
 
-    client->processLoop();
+    client->process_loop();
 
     return 0;
 }
