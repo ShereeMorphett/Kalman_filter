@@ -1,8 +1,9 @@
 
 #include <iostream>
 #include <unistd.h>
+#include <string>
 #include <Eigen/Dense> //may only need the dense
-#include "UDPclient.hpp"
+#include "Kalman.hpp"
 
 /*
 OPTIONS:
@@ -43,33 +44,26 @@ OPTIONS:
     -V, --version
             Print version information
 */
-    // Create a UDP socket.
-        // Send a message to the server.
-        // Wait until a response from the server is received.
-        // Process the reply and go back to step 2, if necessary.
-        // Close socket descriptor and exit.
-        // int socket(int domain, int type, int protocol)
-        // Creates an unbound socket in the specified domain.
-        // Returns socket file descriptor.
+// Create a UDP socket.
+// Send a message to the server.
+// Wait until a response from the server is received.
+// Process the reply and go back to step 2, if necessary.
+// Close socket descriptor and exit.
+// int socket(int domain, int type, int protocol)
+// Creates an unbound socket in the specified domain.
+// Returns socket file descriptor.
 
-    // Arguments : 
-        // domain – Specifies the communication 
-        // domain ( AF_INET for IPv4/ AF_INET6 for IPv6 ) 
-        // type – Type of socket to be created 
-        // ( SOCK_STREAM for TCP / SOCK_DGRAM for UDP ) 
-        // protocol – Protocol to be used by the socket. 
-        // 0 means using the default protocol for the address family.
+// Arguments :
+// domain – Specifies the communication
+// domain ( AF_INET for IPv4/ AF_INET6 for IPv6 )
+// type – Type of socket to be created
+// ( SOCK_STREAM for TCP / SOCK_DGRAM for UDP )
+// protocol – Protocol to be used by the socket.
+// 0 means using the default protocol for the address family.
 
-int main() {
-    std::unique_ptr<UDPClient> client = std::make_unique<UDPClient>();
-
-    client->send_handshake();
-    client->receive_initialization();
-
-    const std::string initial_estimation = "1.7325073314060224 -2.2213777837034083 0.49999962025821726";
-    client->send_estimation(initial_estimation);
-
-    client->process_loop();
-
-    return 0;
+int main()
+{
+        Kalman kalman_filter;
+        kalman_filter.filter_loop();
+        return 0;
 }
