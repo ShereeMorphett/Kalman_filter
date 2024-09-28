@@ -23,5 +23,4 @@ public:
     socklen_t get_sock_len();
     sockaddr_in get_servaddr();
     void send_estimation(const std::string &estimation);
-    void process_loop();
 };

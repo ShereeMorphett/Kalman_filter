@@ -40,18 +40,31 @@ void Kalman::filter_loop()
     int sock_fd = client.get_sock_fd();
     sockaddr_in servaddr = client.get_servaddr();
     socklen_t len = client.get_sock_len();
+
     while (true)
     {
         int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
                                 reinterpret_cast<struct sockaddr *>(&servaddr), &len);
         buffer[buff_len] = '\0';
         msg_count++;
-        std::cout << msg_count << " Server: " << buffer << std::endl;
+        std::string str_buffer = buffer;
 
-        // Update your Kalman filter with the new data in buffer
-        // Calculate and send the new estimation
-        const std::string new_estimation = "0.7325073314060224 -9.2213777837034083 0.19999962025821726"; // Example
-        client.send_estimation(new_estimation);
+        if (str_buffer.find("TRUE POSITION") != std::string::npos)
+        {
+            std::cout << msg_count << " server TRUE POSITION: " << buffer << std::endl;
+        }
+        else if (str_buffer.find("SPEED") != std::string::npos)
+        {
+            std::cout << msg_count << " server SPEED: " << buffer << std::endl;
+        }
+        else if (str_buffer.find("ACCELERATION") != std::string::npos)
+        {
+            std::cout << msg_count << " server ACCELERATION: " << buffer << std::endl;
+        }
+        else if (str_buffer.find("DIRECTION") != std::string::npos)
+        {
+            std::cout << msg_count << " server DIRECTION: " << buffer << std::endl;
+        }
     }
 }
 
