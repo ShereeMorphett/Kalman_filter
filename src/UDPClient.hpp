@@ -9,8 +9,8 @@
 #include <ws2tcpip.h>
 #else
 #include <arpa/inet.h>
-#endif
 #include <unistd.h>
+#endif
 
 
 class UDPClient
