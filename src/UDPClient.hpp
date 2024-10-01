@@ -7,10 +7,13 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#define close closesocket
+#define MSG_CONFIRM 0
 #else
 #include <arpa/inet.h>
 #include <unistd.h>
 #endif
+
 
 
 class UDPClient

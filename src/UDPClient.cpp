@@ -1,13 +1,29 @@
 
 #include "UDPClient.hpp"
 
-UDPClient::UDPClient(int port) : sock_fd(socket(AF_INET, SOCK_DGRAM, 0)), len(sizeof(servaddr))
+UDPClient::UDPClient(int port) : len(sizeof(servaddr))
 {
-    if (sock_fd < 0)
+#ifdef _WIN32
+    WSADATA wsaData;
+    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (result != 0)
     {
-        perror("socket creation failed");
+        std::cerr << "WSAStartup failed: " << result << std::endl;
         exit(EXIT_FAILURE);
     }
+#endif
+
+    sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock_fd < 0)
+    {
+#ifdef _WIN32
+        std::cerr << "Socket creation failed: " << WSAGetLastError() << std::endl;
+#else
+        perror("socket creation failed");
+#endif
+        exit(EXIT_FAILURE);
+    }
+
 
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
@@ -17,7 +33,13 @@ UDPClient::UDPClient(int port) : sock_fd(socket(AF_INET, SOCK_DGRAM, 0)), len(si
 
 UDPClient::~UDPClient()
 {
-    close(sock_fd);
+
+#ifdef _WIN32
+    closesocket(sock_fd);  
+    WSACleanup();          
+#else
+    close(sock_fd);        
+#endif
 }
 
 void UDPClient::send_handshake(std::string handshake)
