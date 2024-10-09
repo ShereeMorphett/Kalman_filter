@@ -27,13 +27,13 @@
 // 0.003958111620245174
 // 0.011566594139606983
 
-// Client: Position estimat
-
-// std::string initial_variables = client->receive_initialization();
-//     std::cout << initial_variables << std::endl;;
-//     const std::string initial_estimation = "1.7325073314060224 -2.2213777837034083 0.49999962025821726";
-//     client->process_loop();
-
+// 1. Understanding the Inputs:
+// Initial Position (X, Y, Z): Your starting true position in 3D space.
+// Initial Speed: Your speed at the beginning (in km/h).
+// Current Acceleration: The current acceleration in 3D space (in m/s²).
+// Current Direction (Euler Angles): The direction the vehicle is heading, given in Euler angles. You’ll need to convert this to a rotation matrix or quaternion for position update calculations.
+// GPS Position: Every 3 seconds, you get a GPS reading, which has noise and provides your position (X, Y, Z).
+// Noise Characteristics: Gaussian white noise added to your sensors, which will need to be modeled in your Kalman filter.
 void Kalman::filter_loop()
 {
     int msg_count = 0;

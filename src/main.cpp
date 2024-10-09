@@ -43,22 +43,6 @@ OPTIONS:
     -V, --version
             Print version information
 */
-// Create a UDP socket.
-// Send a message to the server.
-// Wait until a response from the server is received.
-// Process the reply and go back to step 2, if necessary.
-// Close socket descriptor and exit.
-// int socket(int domain, int type, int protocol)
-// Creates an unbound socket in the specified domain.
-// Returns socket file descriptor.
-
-// Arguments :
-// domain – Specifies the communication
-// domain ( AF_INET for IPv4/ AF_INET6 for IPv6 )
-// type – Type of socket to be created
-// ( SOCK_STREAM for TCP / SOCK_DGRAM for UDP )
-// protocol – Protocol to be used by the socket.
-// 0 means using the default protocol for the address family.
 
 int main()
 {
