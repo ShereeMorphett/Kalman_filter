@@ -1,69 +1,43 @@
 #include "Kalman.hpp"
+#include "vec3.hpp"
+#include <iomanip>
 
 void Kalman::parse_data(std::string str_buffer)
 {
     std::istringstream stream(str_buffer);
     std::string line;
-    
     while (std::getline(stream, line))
     {
         if (line.find("TRUE POSITION") != std::string::npos)
         {
-            std::getline(stream, line);
-            double x, y, z;
-            if (sscanf(line.c_str(), "%lf %lf %lf", &x, &y, &z) == 3)
-            {
-                vec3<double> position = {x, y, z};
-                std::cout << " server TRUE POSITION: "
-                          << position.x << ", " << position.y << ", " << position.z << std::endl;
-                data.push_back(position);
-            }
-            else
-            {
-                std::cerr << "Error parsing TRUE POSITION" << std::endl;
-            }
+            std::cout << "BUFFER IN FULL:" << str_buffer << std::endl;
+
+            vec3<double> position = parse_vec3<double>(stream);
+            std::cout << std::fixed << std::setprecision(15)
+                      << " server TRUE POSITION: "
+                      << position.x << ", " << position.y << ", " << position.z << std::endl;
+
+            data.push_back(position);
         }
         else if (line.find("SPEED") != std::string::npos)
         {
             std::getline(stream, line);
-            if (sscanf(line.c_str(), "%lf", &speed) == 1)
             {
                 std::cout << " server SPEED: " << speed << " km/h" << std::endl;
-            }
-            else
-            {
-                std::cerr << "Error parsing SPEED" << std::endl;
             }
         }
         else if (line.find("ACCELERATION") != std::string::npos)
         {
-            std::getline(stream, line);
-            double ax, ay, az;
-            if (sscanf(line.c_str(), "%lf %lf %lf", &ax, &ay, &az) == 3)
-            {
-                acceleration = {ax, ay, az};
-                std::cout << " server ACCELERATION: "
-                          << acceleration.x << ", " << acceleration.y << ", " << acceleration.z << std::endl;
-            }
-            else
-            {
-                std::cerr << "Error parsing ACCELERATION" << std::endl;
-            }
+            std::cout << "BUFFER IN FULL:" << str_buffer << std::endl;
+            vec3<double> acceleration = parse_vec3<double>(stream);
+            std::cout << " server ACCELERATION: "
+                      << acceleration.x << ", " << acceleration.y << ", " << acceleration.z << std::endl;
         }
         else if (line.find("DIRECTION") != std::string::npos)
         {
-            std::getline(stream, line);
-            double dx, dy, dz;
-            if (sscanf(line.c_str(), "%lf %lf %lf", &dx, &dy, &dz) == 3)
-            {
-                direction = {dx, dy, dz};
-                std::cout << " server DIRECTION: "
-                          << direction.x << ", " << direction.y << ", " << direction.z << std::endl;
-            }
-            else
-            {
-                std::cerr << "Error parsing DIRECTION" << std::endl;
-            }
+            vec3<double> direction = parse_vec3<double>(stream);
+            std::cout << " server DIRECTION: "
+                      << direction.x << ", " << direction.y << ", " << direction.z << std::endl;
         }
     }
 }
@@ -73,10 +47,10 @@ vec3<double> Kalman::calculate_estimation()
     vec3<double> last_position = data.back();
 
     std::stringstream ss;
-    ss << last_position.x << " " << last_position.y << " " << last_position.z;
-
+    ss << std::fixed << std::setprecision(15)
+       << last_position.x << " " << last_position.y << " " << last_position.z;
     std::string estimation = ss.str();
-    std::cout << estimation << std::endl;
+    std::cout << std::fixed << std::setprecision(15) << "ESTIMATION SENT:  " << estimation << std::endl;
 
     client.send_estimation(estimation);
 
@@ -97,7 +71,8 @@ void Kalman::filter_loop()
         std::cout << buffer << std::endl;
         std::string str_buffer = buffer;
         parse_data(buffer);
-        vec3<double> estimation = calculate_estimation();
+        if (data.size() != 0)
+            vec3<double> estimation = calculate_estimation();
     }
 }
 

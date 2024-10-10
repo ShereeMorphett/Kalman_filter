@@ -44,36 +44,21 @@ struct vec3
 };
 
 template <typename T>
-vec3<T> parse_vec3(const std::string &line)
+vec3<T> parse_vec3(std::istringstream &data)
 {
-    std::istringstream iss(line);
-
-    std::vector<T> values;
-    T value;
-
-    while (iss >> value)
-    {
-        char c;
-        if (iss.get(c) && !std::isspace(c))
-        {
-            throw std::invalid_argument("Invalid character detected in vec3 values");
-        }
-
-        values.push_back(value);
-    }
-    if (values.size() != 3)
-    {
-        throw std::invalid_argument("Invalid number of values for vec3");
-    }
+    std::string x_str, y_str, z_str;
+    std::getline(data, x_str);
+    std::getline(data, y_str);
+    std::getline(data, z_str);
 
     vec3<T> point;
-    point.x = values[0];
-    point.y = values[1];
-    point.z = values[2];
+    
+    std::stringstream(x_str) >> point.x;
+    std::stringstream(y_str) >> point.y;
+    std::stringstream(z_str) >> point.z;
 
     return point;
 }
-
 template <typename T>
 T dot(vec3<T> a, vec3<T> b)
 {
