@@ -27,16 +27,17 @@ Noise Characteristics: Gaussian white noise added to your sensors, which will ne
 2. Kalman Filter Overview:
 The Kalman filter estimates the true state (position and velocity) of the vehicle by using:
 
-
 Position and velocity in 3D space.
 Process model: This predicts the next state using acceleration data and integrates it over time.
 Measurement model: Uses GPS data to correct the predicted state.
+
 3. State Initialization:
 The first input you receive will provide the necessary data to initialize your Kalman filter:
 
 Position: Use the initial position directly as the first estimate of the position.
 Velocity: Convert the speed from km/h to m/s and use the initial direction (Euler angles) to resolve the velocity vector in the XYZ frame. You’ll use this for the velocity components of the state.
 Acceleration: This will be used in the process model to update your velocity estimates over time.
+
 4. State Prediction (Process Model):
 Use the acceleration and previous state to predict the new state:
 ​
@@ -46,10 +47,12 @@ You’ll model the measurement noise and process noise as covariance matrices:
 
 Measurement noise covariance (R): Based on the given GPS noise, accelerometer noise, and gyroscope noise.
 Process noise covariance (Q): Models the uncertainty in the process, based on your model assumptions.
+
 7. Kalman Filter Loop:
 Predict: Use the current state and acceleration to predict the next position and velocity.
 Update: When a new GPS measurement arrives, correct the predicted state using the measurement.
 Repeat: Continue the predict-update loop for each time step.
+
 8. Estimation Output:
 After each update, send the estimated position in the required format:
 
@@ -57,9 +60,19 @@ After each update, send the estimated position in the required format:
 
 ```1.7325073314060224 -2.2213777837034083 0.49999962025821726```
 
+
+
+
+
 ### Summary of Steps in Code:
-Initialize the state vector with the initial position and velocity.
+Initialize the state vector with the initial position and velocity. - DONE
 Set up the Kalman filter matrices (F, B, H, Q, R).
+    F models how the system evolves (position and velocity changes over time).
+    B models how the control inputs (e.g., acceleration) affect the system.
+    H maps the state (position and velocity) to the measurements (like GPS).
+    Q represents the uncertainty in the process (system's model inaccuracies).
+    R represents the uncertainty in the measurements (e.g., sensor noise).
+
 For each time step:
 Update the state using the process model (acceleration).
 If a GPS update is available, correct the state using the measurement model.

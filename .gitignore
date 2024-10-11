@@ -34,3 +34,6 @@
 
 # meson subprojects
 subprojects/*/
+
+# vscode settings
+.vscode/

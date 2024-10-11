@@ -1,5 +1,6 @@
 
 #include "UDPClient.hpp"
+#include "colour.hpp"
 
 UDPClient::UDPClient(int port) : len(sizeof(servaddr))
 {
@@ -24,7 +25,6 @@ UDPClient::UDPClient(int port) : len(sizeof(servaddr))
         exit(EXIT_FAILURE);
     }
 
-
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(port);
@@ -35,10 +35,10 @@ UDPClient::~UDPClient()
 {
 
 #ifdef _WIN32
-    closesocket(sock_fd);  
-    WSACleanup();          
+    closesocket(sock_fd);
+    WSACleanup();
 #else
-    close(sock_fd);        
+    close(sock_fd);
 #endif
 }
 
@@ -66,5 +66,7 @@ void UDPClient::send_estimation(const std::string &estimation)
 {
     sendto(sock_fd, estimation.c_str(), estimation.length(), MSG_CONFIRM,
            reinterpret_cast<const struct sockaddr *>(&servaddr), sizeof(servaddr));
-    std::cout << "Client: Position estimation sent." << std::endl;
+
+    std::cout << COLOR_GREEN << "[Client] Position estimation sent.\n"
+              << COLOR_RESET << std::endl;
 }

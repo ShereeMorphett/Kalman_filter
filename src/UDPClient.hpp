@@ -14,8 +14,6 @@
 #include <unistd.h>
 #endif
 
-
-
 class UDPClient
 {
 private:
