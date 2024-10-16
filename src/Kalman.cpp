@@ -1,9 +1,9 @@
 #include "Kalman.hpp"
 #include <iomanip>
 
-static constexpr double wn_accelerometer = 1e-3;
-static constexpr double wn_gyroscope = 1e-2;
-static constexpr double wn_gps = 1e-1;
+static constexpr double gauss_accelerometer = 1e-3;
+static constexpr double gauss_gyroscope = 1e-2;
+static constexpr double gauss_gps = 1e-1;
 
 Eigen::Vector3d parse_eigen_vec3(std::istringstream &data)
 {
@@ -24,6 +24,35 @@ Eigen::Vector3d parse_eigen_vec3(std::istringstream &data)
     return point;
 }
 
+void Kalman::print_matrice()
+{
+    // Print matrices and vectors
+    std::cout << "F (State transition matrix):\n"
+              << F << "\n\n";
+    std::cout << "B (Control input matrix):\n"
+              << B << "\n\n";
+    std::cout << "H (Measurement matrix):\n"
+              << H << "\n\n";
+    std::cout << "Q (Process noise covariance matrix):\n"
+              << Q << "\n\n";
+    std::cout << "R (Measurement noise covariance matrix):\n"
+              << R << "\n\n";
+    std::cout << "P (Error covariance matrix):\n"
+              << P << "\n\n";
+    std::cout << "X (State vector):\n"
+              << X << "\n\n";
+    std::cout << "Z (Measurement vector):\n"
+              << Z << "\n\n";
+}
+// Eigen::MatrixXd F; // State transition matrix
+// Eigen::MatrixXd B; // Control input matrix (acceleration)
+// Eigen::MatrixXd H; // Measurement matrix
+// Eigen::MatrixXd Q; // Process noise covariance matrix
+// Eigen::MatrixXd R; // Measurement noise covariance matrix
+// Eigen::MatrixXd P; // Error covariance matrix
+// Eigen::VectorXd X; // State vector (position, velocity) X(0): Position x. X(1): Position y.  X(2): Position  z. X(3): Velocity  x. X(4): Velocity  y.  X(5): Velocity  z.
+// Eigen::VectorXd Z; // Measurement vector (GPS position)
+
 void Kalman::parse_data(std::string str_buffer)
 {
     std::istringstream stream(str_buffer);
@@ -42,14 +71,18 @@ void Kalman::parse_data(std::string str_buffer)
         {
             std::getline(stream, line);
             {
-                speed = std::stod(line);
-                std::cout << "[server] SPEED: " << speed << " km/h" << std::endl;
+                speed = 0.277778 * (std::stod(line)); // convert km/h to m/s
+                std::cout << "[server] SPEED: " << line << " km/h" << std::endl;
+                std::cout << "[server] SPEED: " << speed << " m/s" << std::endl;
             }
         }
         else if (line.find("ACCELERATION") != std::string::npos)
         {
             Eigen::Vector3d accel = parse_eigen_vec3(stream);
-            X.segment<3>(3) = accel; // Set the velocity part of the state vector (X), or use it to update velocity, this will need a function to work out the velocity
+
+            // Predict state based on acceleration (X = F * X + B * U)
+            X = F * X + B * accel;
+
             std::cout << "[server] ACCELERATION: "
                       << accel(0) << ", " << accel(1) << ", " << accel(2) << std::endl;
         }
@@ -58,12 +91,27 @@ void Kalman::parse_data(std::string str_buffer)
             Eigen::Matrix<double, 3, 1> direction = parse_eigen_vec3(stream);
             std::cout << "[server] DIRECTION: "
                       << direction(0) << ", " << direction(1) << ", " << direction(2) << std::endl;
+            if (!initalized)
+            {
+                initalized = true;
+                print_matrice();
+            }
         }
     }
 }
 
+void Kalman::predict()
+{
+    // Predict state: X = F * X + B * U (where U is the acceleration)
+    X = F * X + B * acceleration;
+
+    // Predict covariance: P = F * P * F^T + Q
+    P = F * P * F.transpose() + Q;
+}
+
 Eigen::Vector3d Kalman::calculate_estimation()
 {
+    predict();
     std::stringstream ss;
     Eigen::Vector3d last_position = X.segment<3>(0);
     ss << std::fixed << std::setprecision(15)
@@ -87,17 +135,27 @@ void Kalman::filter_loop()
         int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
                                 reinterpret_cast<struct sockaddr *>(&servaddr), &len);
         buffer[buff_len] = '\0';
-        std::cout << buffer << std::endl;
         std::string str_buffer = buffer;
         parse_data(buffer);
-        if (X.size() != 0)
+        if (X.size() != 0 && initalized)
             Eigen::Vector3d estimation = calculate_estimation();
     }
 }
 
-Kalman::Kalman(int port, std::string handshake) : client(port), acceleration(0, 0, 0), F(6, 6), B(6, 3), H(3, 6), Q(6, 6), R(3, 3), P(6, 6), X(6), Z(3)
+Kalman::Kalman(int port, std::string handshake) : client(port), acceleration(0, 0, 0), F(6, 6), B(6, 3), H(3, 6), Q(6, 6), R(3, 3), P(6, 6), X(6), Z(3), initalized(false)
 {
     client.send_handshake(handshake);
+    F.setIdentity(6, 6);
+    F.block<3, 3>(0, 3).setIdentity(); // Positions evolve into velocities
+
+    B.setZero(6, 3);
+    B.block<3, 3>(3, 0).setIdentity(); // Accelerations affect velocity
+
+    Q.setIdentity(6, 6);
+    Q *= 1e-4; // Tuning parameter for process noise
+
+    R.setIdentity(3, 3);
+    R *= gauss_gps; // GPS noise, for instance
 }
 
 Kalman::~Kalman() {};

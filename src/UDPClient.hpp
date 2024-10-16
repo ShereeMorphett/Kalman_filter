@@ -20,6 +20,7 @@ private:
     int sock_fd;
     struct sockaddr_in servaddr;
     socklen_t len;
+    int msg_sent;
 
 public:
     UDPClient(int port);

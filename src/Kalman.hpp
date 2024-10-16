@@ -21,11 +21,14 @@ private:
     Eigen::MatrixXd P; // Error covariance matrix
     Eigen::VectorXd X; // State vector (position, velocity) X(0): Position x. X(1): Position y.  X(2): Position  z. X(3): Velocity  x. X(4): Velocity  y.  X(5): Velocity  z.
     Eigen::VectorXd Z; // Measurement vector (GPS position)
+    bool initalized;
 
 public:
     void extract_data(std::string server_data);
     void filter_loop();
     void parse_data(std::string stream);
+    void predict();
+    void print_matrice();
     Eigen::Vector3d calculate_estimation();
     Kalman(int port = 8080, std::string handshake = "READY");
     ~Kalman();

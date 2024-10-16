@@ -24,7 +24,7 @@ UDPClient::UDPClient(int port) : len(sizeof(servaddr))
 #endif
         exit(EXIT_FAILURE);
     }
-
+    msg_sent = 0;
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(port);
@@ -66,7 +66,7 @@ void UDPClient::send_estimation(const std::string &estimation)
 {
     sendto(sock_fd, estimation.c_str(), estimation.length(), MSG_CONFIRM,
            reinterpret_cast<const struct sockaddr *>(&servaddr), sizeof(servaddr));
-
-    std::cout << COLOR_GREEN << "[Client] Position estimation sent.\n"
+    msg_sent++;
+    std::cout << COLOR_GREEN << "[Client] Position [" << msg_sent << "] estimation sent.\n"
               << COLOR_RESET << std::endl;
 }
