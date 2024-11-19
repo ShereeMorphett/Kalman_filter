@@ -10,17 +10,18 @@ class Kalman
 {
 private:
     UDPClient client;
+    unsigned int k; // current iteration of Kalman
     double speed;
     char buffer[MAXLINE];
     Eigen::Vector3d acceleration;
-    Eigen::MatrixXd F; // State transition matrix
-    Eigen::MatrixXd B; // Control input matrix (acceleration)
-    Eigen::MatrixXd H; // Measurement matrix
-    Eigen::MatrixXd Q; // Process noise covariance matrix
-    Eigen::MatrixXd R; // Measurement noise covariance matrix
-    Eigen::MatrixXd P; // Error covariance matrix
-    Eigen::VectorXd X; // State vector (position, velocity) X(0): Position x. X(1): Position y.  X(2): Position  z. X(3): Velocity  x. X(4): Velocity  y.  X(5): Velocity  z.
-    Eigen::VectorXd Z; // Measurement vector (GPS position)
+    Eigen::MatrixXd F; // State transition matrix  - 
+    Eigen::MatrixXd B; // Control input matrix (acceleration)  - U
+    Eigen::MatrixXd H; // Measurement matrix  -
+    Eigen::MatrixXd Q; // Process noise covariance matrix  - 
+    Eigen::MatrixXd R; // Measurement noise covariance matrix  -
+    Eigen::MatrixXd P; // Error covariance matrix  -
+    Eigen::VectorXd X; // State vector (position, velocity) X(0): Position x. X(1): Position y.  X(2): Position  z. X(3): Velocity  x. X(4): Velocity  y.  X(5): Velocity  z.  -
+    Eigen::VectorXd Z; // Measurement vector (GPS position)   -
     bool initalized;
 
 public:
