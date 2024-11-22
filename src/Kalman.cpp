@@ -3,7 +3,7 @@
 
 static constexpr double gauss_accelerometer = 1e-3;
 static constexpr double gauss_gyroscope = 1e-2;
-static constexpr double gauss_gps = 1e-1;
+static constexpr double gauss_gps = 1e-2;
 
 Eigen::Vector3d parse_eigen_vec3(std::istringstream &data)
 {
@@ -80,8 +80,9 @@ void Kalman::parse_data(std::string str_buffer)
         {
             Eigen::Vector3d accel = parse_eigen_vec3(stream);
 
-            // Predict state based on acceleration (X = F * X + B * U)
-            X = F * X + B * accel;
+            acceleration = accel;
+
+            X = F * X + B * acceleration;
 
             std::cout << "[server] ACCELERATION: "
                       << accel(0) << ", " << accel(1) << ", " << accel(2) << std::endl;
@@ -98,6 +99,17 @@ void Kalman::parse_data(std::string str_buffer)
             }
         }
     }
+}
+
+void Kalman::update()
+{
+    Eigen::Vector3d Y = Z - H * X;
+
+    Eigen::MatrixXd S = H * P * H.transpose() + R;
+    Eigen::MatrixXd K = P * H.transpose() * S.inverse();
+
+    X = X + K * Y;
+    P = (Eigen::MatrixXd::Identity(6, 6) - K * H) * P;
 }
 
 void Kalman::predict()
@@ -138,7 +150,10 @@ void Kalman::filter_loop()
         std::string str_buffer = buffer;
         parse_data(buffer);
         if (X.size() != 0 && initalized)
+        {
+            update();
             Eigen::Vector3d estimation = calculate_estimation();
+        }
     }
 }
 
@@ -151,11 +166,14 @@ Kalman::Kalman(int port, std::string handshake) : client(port), acceleration(0, 
     B.setZero(6, 3);
     B.block<3, 3>(3, 0).setIdentity(); // Accelerations affect velocity
 
-    Q.setIdentity(6, 6);
-    Q *= 1e-4; // Tuning parameter for process noise
+    Q.setIdentity(6, 6); // Process noise
+    Q.block<3, 3>(0, 0) *= gauss_accelerometer;
+    Q.block<3, 3>(3, 3) *= gauss_gyroscope;
 
-    R.setIdentity(3, 3);
-    R *= gauss_gps; // GPS noise, for instance
+    R.setIdentity(3, 3); // Measurement noise
+    R *= gauss_gps;
+
+    P.setIdentity(6, 6) * 1e-3; // Initial covariance
 }
 
 Kalman::~Kalman() {};
