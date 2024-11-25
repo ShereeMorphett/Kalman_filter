@@ -74,6 +74,7 @@ void Kalman::parse_data(std::string str_buffer)
                 speed = 0.277778 * (std::stod(line)); // convert km/h to m/s
                 std::cout << "[server] SPEED: " << line << " km/h" << std::endl;
                 std::cout << "[server] SPEED: " << speed << " m/s" << std::endl;
+                std::cout << "[server] UPDATED" << std::endl;
             }
         }
         else if (line.find("ACCELERATION") != std::string::npos)
@@ -92,6 +93,8 @@ void Kalman::parse_data(std::string str_buffer)
             Eigen::Matrix<double, 3, 1> direction = parse_eigen_vec3(stream);
             std::cout << "[server] DIRECTION: "
                       << direction(0) << ", " << direction(1) << ", " << direction(2) << std::endl;
+            std::cout << "[server] UPDATED" << std::endl;
+
             if (!initalized)
             {
                 initalized = true;
@@ -104,7 +107,6 @@ void Kalman::parse_data(std::string str_buffer)
 void Kalman::update()
 {
     Eigen::Vector3d Y = Z - H * X;
-
     Eigen::MatrixXd S = H * P * H.transpose() + R;
     Eigen::MatrixXd K = P * H.transpose() * S.inverse();
 
@@ -112,8 +114,11 @@ void Kalman::update()
     P = (Eigen::MatrixXd::Identity(6, 6) - K * H) * P;
 }
 
-void Kalman::predict()
+void Kalman::predict(double dt)
 {
+    // Update the state transition matrix F with the current time step
+    F.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity() * dt;
+
     // Predict state: X = F * X + B * U (where U is the acceleration)
     X = F * X + B * acceleration;
 
@@ -123,7 +128,7 @@ void Kalman::predict()
 
 Eigen::Vector3d Kalman::calculate_estimation()
 {
-    predict();
+
     std::stringstream ss;
     Eigen::Vector3d last_position = X.segment<3>(0);
     ss << std::fixed << std::setprecision(15)
@@ -141,7 +146,9 @@ void Kalman::filter_loop()
     int sock_fd = client.get_sock_fd();
     sockaddr_in servaddr = client.get_servaddr();
     socklen_t len = client.get_sock_len();
-
+    auto current_time = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_update).count() / 1000.0; // in seconds
+    last_update = current_time;
     while (true)
     {
         int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
@@ -151,6 +158,7 @@ void Kalman::filter_loop()
         parse_data(buffer);
         if (X.size() != 0 && initalized)
         {
+            predict(dt);
             update();
             Eigen::Vector3d estimation = calculate_estimation();
         }
@@ -171,9 +179,10 @@ Kalman::Kalman(int port, std::string handshake) : client(port), acceleration(0, 
     Q.block<3, 3>(3, 3) *= gauss_gyroscope;
 
     R.setIdentity(3, 3); // Measurement noise
-    R *= gauss_gps;
+    R *= gauss_gps * gauss_gps;
 
     P.setIdentity(6, 6) * 1e-3; // Initial covariance
+    last_update = std::chrono::steady_clock::now();
 }
 
 Kalman::~Kalman() {};

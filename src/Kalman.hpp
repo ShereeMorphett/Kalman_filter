@@ -3,6 +3,7 @@
 #include <vector>
 #include "UDPClient.hpp"
 #include <Eigen/Dense>
+#include <chrono>
 
 inline constexpr int MAXLINE = 1024;
 
@@ -22,13 +23,15 @@ private:
     Eigen::MatrixXd P; // Error covariance matrix  -
     Eigen::VectorXd X; // State vector (position, velocity) X(0): Position x. X(1): Position y.  X(2): Position  z. X(3): Velocity  x. X(4): Velocity  y.  X(5): Velocity  z.  -
     Eigen::VectorXd Z; // Measurement vector (GPS position)   -
+    std::chrono::time_point<std::chrono::steady_clock> last_update;
+
     bool initalized;
 
 public:
     void extract_data(std::string server_data);
     void filter_loop();
     void parse_data(std::string stream);
-    void predict();
+    void predict(double dt);
     void print_matrice();
     void update();
     Eigen::Vector3d calculate_estimation();
