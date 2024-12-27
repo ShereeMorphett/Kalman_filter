@@ -15,14 +15,14 @@ private:
     double speed;
     char buffer[MAXLINE];
     Eigen::Vector3d acceleration;
-    Eigen::MatrixXd F; // State transition matrix  -
-    Eigen::MatrixXd B; // Control input matrix (acceleration)  - U
-    Eigen::MatrixXd H; // Measurement matrix  -
-    Eigen::MatrixXd Q; // Process noise covariance matrix  -
-    Eigen::MatrixXd R; // Measurement noise covariance matrix  -
-    Eigen::MatrixXd P; // Error covariance matrix  -
-    Eigen::VectorXd X; // State vector (position, velocity) X(0): Position x. X(1): Position y.  X(2): Position  z. X(3): Velocity  x. X(4): Velocity  y.  X(5): Velocity  z.  -
-    Eigen::VectorXd Z; // Measurement vector (GPS position)   -
+    Eigen::MatrixXd StateTransitionMatrix;    // State transition matrix  -
+    Eigen::MatrixXd ControlInputMatrix;       // Control input matrix (acceleration)  - U NOT NECESSARY
+    Eigen::MatrixXd MeasurementToStateMatrix; // Measurement matrix  -
+    Eigen::MatrixXd ProcessErrorMatrix;       // Process noise covariance matrix  -
+    Eigen::MatrixXd MeasurementNoiseMatrix;   // Measurement noise covariance matrix  -
+    Eigen::MatrixXd ErrorCovarianceMatrix;    // Error covariance matrix  -
+    Eigen::VectorXd StateVector;              // State vector (position, velocity) X(0): Position x. X(1): Position y.  X(2): Position  z. X(3): Velocity  x. X(4): Velocity  y.  X(5): Velocity  z.  -
+    Eigen::VectorXd MeasurementVector;        // Measurement vector (GPS position)   -
     std::chrono::time_point<std::chrono::steady_clock> last_update;
     bool initalized;
 

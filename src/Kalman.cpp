@@ -105,33 +105,35 @@ void Kalman::parse_data(std::string str_buffer)
 
 void Kalman::update()
 {
-    Eigen::Vector3d Y = Z - H * X;
-    Eigen::MatrixXd S = H * P * H.transpose() + R;
-    Eigen::MatrixXd K = P * H.transpose() * S.inverse();
+    // I want to pass the resprective measurement to state matrix with the respective measurement to update this.
+    //  Requires to compute the new matrix outside, the respective measurement comes in.
 
-    X = X + K * Y;
-    P = (Eigen::MatrixXd::Identity(6, 6) - K * H) * P;
+    Eigen::MatrixXd InnovationCov = MeasurementToStateMatrix * ErrorCovarianceMatrix * MeasurementToStateMatrix.transpose() + MeasurementNoiseMatrix;
+    Eigen::MatrixXd KalmanGain = ErrorCovarianceMatrix * MeasurementNoiseMatrix.transpose() * InnovationCov.inverse();
+
+    StateVector = (Eigen::MatrixXd::Identity(12, 12) - KalmanGain * MeasurementToStateMatrix) * StateVector + KalmanGain * MeasurementVector;
+    ErrorCovarianceMatrix = (Eigen::MatrixXd::Identity(12, 12) - KalmanGain * MeasurementToStateMatrix) * ErrorCovarianceMatrix;
 }
 
 void Kalman::predict(double dt)
 {
-    // Update the state transition matrix F with the current time step
-    F.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity() * dt;
 
-    // Predict state: X = F * X + B * U (where U is the acceleration)
-    X = F * X + B * acceleration;
+    // Update the state transition matrix F with the current time step
+    StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity() * dt;
+
+    StateVector = StateTransitionMatrix * StateVector; // Need to correct for the measurement specific state matrix
 
     // Predict covariance: P = F * P * F^T + Q
-    P = F * P * F.transpose() + Q;
+    ErrorCovarianceMatrix = StateTransitionMatrix * ErrorCovarianceMatrix * StateTransitionMatrix.transpose() + ProcessErrorMatrix; // NEEd to think how this is influenced by the measurement. Do we even need a big state transition matrix anymore?
 }
 
 Eigen::Vector3d Kalman::calculate_estimation()
 {
 
     std::stringstream ss;
-    Eigen::Vector3d last_position = X.segment<3>(0);
+    Eigen::Vector3d last_position = StateVector.segment<3>(0);
     ss << std::fixed << std::setprecision(15)
-       << X(0) << " " << X(1) << " " << X(2);
+       << StateVector(0) << " " << StateVector(1) << " " << StateVector(2);
     std::string estimation = ss.str();
     std::cout << std::fixed << std::setprecision(15) << "ESTIMATION SENT:  " << estimation << std::endl;
 
@@ -164,23 +166,30 @@ void Kalman::filter_loop()
     }
 }
 
-Kalman::Kalman(int port, std::string handshake) : client(port), acceleration(0, 0, 0), F(6, 6), B(6, 3), H(3, 6), Q(6, 6), R(3, 3), P(6, 6), X(6), Z(3), initalized(false)
+Kalman::Kalman(int port, std::string handshake) : client(port),
+                                                  StateTransitionMatrix(12, 12),
+                                                  ProcessErrorMatrix(12, 12),
+                                                  MeasurementNoiseMatrix(9, 9),
+                                                  ErrorCovarianceMatrix(12, 12),
+                                                  StateVector(12),
+                                                  MeasurementVector(3),
+                                                  initalized(false)
 {
     client.send_handshake(handshake);
-    F.setIdentity(6, 6);
-    F.block<3, 3>(0, 3).setIdentity(); // Positions evolve into velocities
 
-    B.setZero(6, 3);
-    B.block<3, 3>(3, 0).setIdentity(); // Accelerations affect velocity
+    StateTransitionMatrix.setIdentity();
+    StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity();
+    StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity();
+    // TODO: Influence of orientation is missing from the state transition matrix
 
-    Q.setIdentity(6, 6); // Process noise
-    Q.block<3, 3>(0, 0) *= gauss_accelerometer;
-    Q.block<3, 3>(3, 3) *= gauss_gyroscope;
+    ProcessErrorMatrix.setIdentity() * 1e-3;
 
-    R.setIdentity(3, 3); // Measurement noise
-    R *= gauss_gps * gauss_gps;
+    ErrorCovarianceMatrix.setZero();
 
-    P.setIdentity(6, 6) * 1e-3; // Initial covariance
+    MeasurementNoiseMatrix.block<3, 3>(0, 0) = Eigen::MatrixXd::Identity() * variance_gps;
+    MeasurementNoiseMatrix.block<3, 3>(3, 3) = Eigen::MatrixXd::Identity() * variance_accelerometer;
+    MeasurementNoiseMatrix.block<3, 3>(6, 6) = Eigen::MatrixXd::Identity() * variance_gyroscope;
+
     last_update = std::chrono::steady_clock::now();
 }
 
