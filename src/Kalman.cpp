@@ -142,14 +142,36 @@ Eigen::Vector3d Kalman::calculate_estimation()
     return last_position;
 }
 
+/* TODO:
+    Current idea:
+        - Implement the Kalman filter specific to measurements
+            - get rid of large measurement to state matrix
+            - instead implement measurement specific matrices that are produced on the spot, scaled by time for error
+            - can memoize the new values, if necessary (not sure if necessary yet)
+            - The idea is to have the loop continuously predict and update, when data comes in
+            - Eg we get a new acceleration measurement. We do the prediction as always
+              We then update the state vector with the new acceleration and the error covariance matrix
+              and send the new estimation back to the server and do that for all incomming data.
+        - Datatransfer:
+            - Need to confirm how data comes in. Are packages dropped, if we are not ready to receive?
+            - Do packages come individually or potentially in batch?
+        - I don't think we need the control input matrix. We could keep it in and set it to 0. If we do the initiailisation more
+          modularly, this whole thing could be more flexible for whatever future use.
+*/
+
+double Kalman::get_time()
+{
+    auto current_time = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_update).count() / 1000.0; // in seconds
+    last_update = current_time;
+    return dt;
+}
+
 void Kalman::filter_loop()
 {
     int sock_fd = client.get_sock_fd();
     sockaddr_in servaddr = client.get_servaddr();
     socklen_t len = client.get_sock_len();
-    auto current_time = std::chrono::steady_clock::now();
-    double dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_update).count() / 1000.0; // in seconds
-    last_update = current_time;
     while (true)
     {
         int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
@@ -157,10 +179,14 @@ void Kalman::filter_loop()
         buffer[buff_len] = '\0';
         std::string str_buffer = buffer;
         parse_data(buffer);
-        if (X.size() != 0 && initalized)
+        double dt = get_time();
+        // after parsing calculate the measurement to state matrix depending on the data.
+        if (StateVector.size() != 0 && initalized)
         {
+            // Always execute both, when data comes in
+            // Need to decide, whether we want to continuously predict and report or only when measurement corrected report.
             predict(dt);
-            update();
+            update(); // needs to take matrix
             Eigen::Vector3d estimation = calculate_estimation();
         }
     }

@@ -58,6 +58,7 @@ public:
     void predict(double dt);
     void print_matrices();
     void update();
+    double get_time();
     Eigen::Vector3d calculate_estimation();
     Kalman(int port = 8080, std::string handshake = "READY");
     ~Kalman();
