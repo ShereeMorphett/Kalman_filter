@@ -25,26 +25,26 @@ Eigen::Vector3d parse_eigen_vec3(std::istringstream &data)
     return point;
 }
 
-void Kalman::print_matrice()
-{
-    // Print matrices and vectors
-    std::cout << "F (State transition matrix):\n"
-              << F << "\n\n";
-    std::cout << "B (Control input matrix):\n"
-              << B << "\n\n";
-    std::cout << "H (Measurement matrix):\n"
-              << H << "\n\n";
-    std::cout << "Q (Process noise covariance matrix):\n"
-              << Q << "\n\n";
-    std::cout << "R (Measurement noise covariance matrix):\n"
-              << R << "\n\n";
-    std::cout << "P (Error covariance matrix):\n"
-              << P << "\n\n";
-    std::cout << "X (State vector):\n"
-              << X << "\n\n";
-    std::cout << "Z (Measurement vector):\n"
-              << Z << "\n\n";
-}
+// void Kalman::print_matrices()
+// {
+//     // Print matrices and vectors
+//     std::cout << "F (State transition matrix):\n"
+//               << F << "\n\n";
+//     std::cout << "B (Control input matrix):\n"
+//               << B << "\n\n";
+//     std::cout << "H (Measurement matrix):\n"
+//               << H << "\n\n";
+//     std::cout << "Q (Process noise covariance matrix):\n"
+//               << Q << "\n\n";
+//     std::cout << "R (Measurement noise covariance matrix):\n"
+//               << R << "\n\n";
+//     std::cout << "P (Error covariance matrix):\n"
+//               << P << "\n\n";
+//     std::cout << "X (State vector):\n"
+//               << X << "\n\n";
+//     std::cout << "Z (Measurement vector):\n"
+//               << Z << "\n\n";
+// }
 // Eigen::MatrixXd F; // State transition matrix
 // Eigen::MatrixXd B; // Control input matrix (acceleration)
 // Eigen::MatrixXd H; // Measurement matrix
