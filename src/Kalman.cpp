@@ -1,9 +1,10 @@
 #include "Kalman.hpp"
 #include <iomanip>
+#include <regex>
 
-static constexpr double gauss_accelerometer = 1e-3;
-static constexpr double gauss_gyroscope = 1e-2;
-static constexpr double gauss_gps = 1e-2;
+static constexpr double variance_accelerometer = 1e-9; // 1e-3 * 1e-3
+static constexpr double variance_gyroscope = 1e-4;     // 1e-2 * 1e-2
+static constexpr double variance_gps = 1e-2;           // 1e-1 * 1e-1
 
 Eigen::Vector3d parse_eigen_vec3(std::istringstream &data)
 {
