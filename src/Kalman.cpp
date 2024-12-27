@@ -74,6 +74,7 @@ Kalman::MeasurementData Kalman::parse_measurement(std::string str_buffer)
             data.type = type_map[capital_letters];
         }
     }
+    return data;
 }
 
 void Kalman::parse_data(std::string str_buffer)
@@ -94,11 +95,13 @@ void Kalman::parse_data(std::string str_buffer)
             data.values *= 0.277778; // convert km/h to m/s
             StateVector.segment<3>(3) = data.values;
             break;
+            default:
+                break;
         }
         if (!initalized)
         {
             initalized = true;
-            print_matrices();
+            // print_matrices();
         }
     }
 }
@@ -188,6 +191,7 @@ void Kalman::filter_loop()
             predict(dt);
             update(); // needs to take matrix
             Eigen::Vector3d estimation = calculate_estimation();
+            (void) estimation;
         }
     }
 }
@@ -204,17 +208,17 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
     client.send_handshake(handshake);
 
     StateTransitionMatrix.setIdentity();
-    StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity();
-    StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity();
+    StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity(3, 3);
+    StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity(3, 3);
     // TODO: Influence of orientation is missing from the state transition matrix
 
     ProcessErrorMatrix.setIdentity() * 1e-3;
 
     ErrorCovarianceMatrix.setZero();
 
-    MeasurementNoiseMatrix.block<3, 3>(0, 0) = Eigen::MatrixXd::Identity() * variance_gps;
-    MeasurementNoiseMatrix.block<3, 3>(3, 3) = Eigen::MatrixXd::Identity() * variance_accelerometer;
-    MeasurementNoiseMatrix.block<3, 3>(6, 6) = Eigen::MatrixXd::Identity() * variance_gyroscope;
+    MeasurementNoiseMatrix.block<3, 3>(0, 0) = Eigen::MatrixXd::Identity(3, 3) * variance_gps;
+    MeasurementNoiseMatrix.block<3, 3>(3, 3) = Eigen::MatrixXd::Identity(3, 3) * variance_accelerometer;
+    MeasurementNoiseMatrix.block<3, 3>(6, 6) = Eigen::MatrixXd::Identity(3, 3) * variance_gyroscope;
 
     last_update = std::chrono::steady_clock::now();
 }
