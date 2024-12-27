@@ -54,53 +54,51 @@ Eigen::Vector3d parse_eigen_vec3(std::istringstream &data)
 // Eigen::VectorXd X; // State vector (position, velocity) X(0): Position x. X(1): Position y.  X(2): Position  z. X(3): Velocity  x. X(4): Velocity  y.  X(5): Velocity  z.
 // Eigen::VectorXd Z; // Measurement vector (GPS position)
 
-void Kalman::parse_data(std::string str_buffer)
+
+Kalman::MeasurementData Kalman::parse_measurement(std::string str_buffer)
 {
     std::istringstream stream(str_buffer);
     std::string line;
+    std::regex capital_regex("[A-Z]+");
+    std::smatch match;
+    MeasurementData data;
+
     while (std::getline(stream, line))
     {
-        if (line.find("TRUE POSITION") != std::string::npos)
+        if (std::regex_search(line, match, capital_regex))
         {
-            Eigen::Vector3d position = parse_eigen_vec3(stream);
-            X.segment<3>(0) = position;
-            std::cout << std::fixed << std::setprecision(15)
-                      << "[server] TRUE POSITION: "
-                      << position(0) << ", " << position(1) << ", " << position(2) << std::endl;
+            std::string capital_letters = match.str(0);
+            std::cout << "[server] " << capital_letters << ":" << std::endl;
+            data.values = parse_eigen_vec3(stream);
+            std::cout << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
+            data.type = type_map[capital_letters];
         }
-        else if (line.find("SPEED") != std::string::npos)
+    }
+}
+
+void Kalman::parse_data(std::string str_buffer)
+{
+    std::string line;
+    std::istringstream stream(str_buffer);
+
+    while (std::getline(stream, line))
+    {
+        MeasurementData data = parse_measurement(str_buffer);
+
+        switch (data.type)
         {
-            std::getline(stream, line);
-            {
-                speed = 0.277778 * (std::stod(line)); // convert km/h to m/s
-                std::cout << "[server] SPEED: " << line << " km/h" << std::endl;
-                std::cout << "[server] SPEED: " << speed << " m/s" << std::endl;
-                std::cout << "[server] UPDATED" << std::endl;
-            }
+        case Type::TruePosition:
+            StateVector.segment<3>(0) = data.values;
+            break;
+        case Type::Velocity:
+            data.values *= 0.277778; // convert km/h to m/s
+            StateVector.segment<3>(3) = data.values;
+            break;
         }
-        else if (line.find("ACCELERATION") != std::string::npos)
+        if (!initalized)
         {
-            Eigen::Vector3d accel = parse_eigen_vec3(stream);
-
-            acceleration = accel;
-
-            X = F * X + B * acceleration;
-
-            std::cout << "[server] ACCELERATION: "
-                      << accel(0) << ", " << accel(1) << ", " << accel(2) << std::endl;
-        }
-        else if (line.find("DIRECTION") != std::string::npos)
-        {
-            Eigen::Matrix<double, 3, 1> direction = parse_eigen_vec3(stream);
-            std::cout << "[server] DIRECTION: "
-                      << direction(0) << ", " << direction(1) << ", " << direction(2) << std::endl;
-            std::cout << "[server] UPDATED" << std::endl;
-
-            if (!initalized)
-            {
-                initalized = true;
-                print_matrice();
-            }
+            initalized = true;
+            print_matrices();
         }
     }
 }
