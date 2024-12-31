@@ -197,21 +197,78 @@ void Kalman::filter_loop()
     MeasurementData data;
     while (true)
     {
+        double dt = get_dt();
+        predict(dt);
+        // TODO: check if we can safely return to recvfrom if we're not waiting for data
+
         int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
                                 reinterpret_cast<struct sockaddr *>(&servaddr), &len);
+        if (buff_len == -1)
+        {
+            std::cerr << "Error receiving data" << std::endl;
+            continue;
+        }
         buffer[buff_len] = '\0';
         std::string str_buffer = buffer;
         data = parse_data(buffer);
-        double dt = get_time();
-        Eigen::MatrixXd MeasurementToStateMatrix = get_mts_matrix(data.type);
-        // after parsing calculate the measurement to state matrix depending on the data.
         if (StateVector.size() != 0 && initalized)
         {
-            predict(dt);
+            Eigen::MatrixXd MeasurementToStateMatrix = get_mts_matrix(data.type);
             update(data.values, MeasurementToStateMatrix);
             Eigen::Vector3d estimation = send_result();
             (void)estimation;
         }
+    }
+}
+
+void Kalman::filter_loop()
+{
+    struct timeval timeout;
+    fd_set sock_fds;
+    int sock_fd = client.get_sock_fd();
+    sockaddr_in servaddr = client.get_servaddr();
+    socklen_t len = client.get_sock_len();
+    MeasurementData data;
+    double dt;
+
+    MeasurementData data;
+    int buff_len;
+    while (true)
+    {
+        FD_ZERO(&sock_fds);
+        FD_SET(sock_fd, &sock_fds);
+
+        // Set timeout to 0 for non-blocking check
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 0;
+
+        int activity = select(sock_fd + 1, &sock_fds, nullptr, nullptr, &timeout);
+
+        if (activity > 0 && FD_ISSET(sock_fd, &sock_fds))
+        {
+            // Data is available to read
+            buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
+                                reinterpret_cast<struct sockaddr *>(&servaddr), &len);
+            if (buff_len < 0)
+            {
+                // Process the received data
+                std::cout << "Error receiving message" << std::endl;
+            }
+            buffer[buff_len] = '\0';
+            std::string str_buffer = buffer;
+            data = parse_data(buffer);
+            if (StateVector.size() != 0 && initalized)
+            {
+                Eigen::MatrixXd MeasurementToStateMatrix = get_mts_matrix(data.type);
+                update(data.values, MeasurementToStateMatrix);
+                Eigen::Vector3d estimation = send_result();
+                (void)estimation;
+            }
+        }
+        // Perform the prediction step or other work
+        dt = get_dt();
+        predict(dt);
+        send_result();
     }
 }
 
