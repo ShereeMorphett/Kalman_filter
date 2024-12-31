@@ -281,17 +281,17 @@ Eigen::MatrixXd Kalman::get_body_to_inertial_rotation(Eigen::Vector3d angles)
     double sin_yaw = sin(angles(2));
     double cos_yaw = cos(angles(2));
 
-    Eigen::Matrix3d r_roll {{ 1, 0, 0},
-                            {0, cos_roll, sin_roll},
-                            {0, -sin_roll, cos_roll}};
+    Eigen::Matrix3d r_roll{{1, 0, 0},
+                           {0, cos_roll, sin_roll},
+                           {0, -sin_roll, cos_roll}};
 
-    Eigen::Matrix3d r_pitch {{cos_pitch, 0, -sin_pitch},
+    Eigen::Matrix3d r_pitch{{cos_pitch, 0, -sin_pitch},
                             {0, 1, 0},
                             {sin_pitch, 0, cos_pitch}};
 
-    Eigen::Matrix3d r_yaw {{cos_yaw, sin_yaw, 0},
-                            {-sin_yaw, cos_yaw, 0},
-                            {0, 0, 1}};
+    Eigen::Matrix3d r_yaw{{cos_yaw, sin_yaw, 0},
+                          {-sin_yaw, cos_yaw, 0},
+                          {0, 0, 1}};
 
     /*
         As of now, I am faily confident we are in a rh coordinate system,
@@ -312,8 +312,8 @@ void Kalman::update_state_transition_matrix(double dt)
     // updates acceleration in position
     StateTransitionMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity(3, 3) * 0.5 * dt * dt;
 
-    //update rotation in acceleration'
-    StateTransitionMatrix.block<3, 3>(9, 6) = Eigen::Matrix3d::Identity(3, 3) * get_body_to_inertial_rotation(Eigen::Vector3d(0, 0, 0)); // need to get angles into the function
+    // update rotation in acceleration
+    StateTransitionMatrix.block<3, 3>(9, 6) = Eigen::Matrix3d::Identity(3, 3) * StateVector.segment(9, 3);
 }
 
 void Kalman::get_state_transition_matrix()
