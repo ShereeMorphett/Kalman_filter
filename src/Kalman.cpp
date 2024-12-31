@@ -156,14 +156,14 @@ Eigen::Vector3d Kalman::send_result()
               We then update the state vector with the new acceleration and the error covariance matrix
               and send the new estimation back to the server and do that for all incomming data.
         - Datatransfer:
-            - Need to confirm how data comes in. Are packages dropped, if we are not ready to receive?
+            x Need to confirm how data comes in. Are packages dropped, if we are not ready to receive?
             - Do packages come individually or potentially in batch, like the first contact?
         - I don't think we need the control input matrix. We could keep it in and set it to 0. If we do the initiailisation more
           modularly, this whole thing could be more flexible for whatever future use.
 */
 
 // could be a static function/ we don't need to create them everytime. Could be another lookup table
-void Kalman::get_mts_matrix(Type type)
+Eigen::MatrixXd Kalman::get_mts_matrix(Type type)
 {
     Eigen::MatrixXd MeasurementToStateMatrix = Eigen::MatrixXd::Zero(12, 3);
     switch (type)
@@ -210,10 +210,8 @@ void Kalman::filter_loop()
         // after parsing calculate the measurement to state matrix depending on the data.
         if (StateVector.size() != 0 && initalized)
         {
-            // Always execute both, when data comes in
-            // Need to decide, whether we want to continuously predict and report or only when measurement corrected report.
             predict(dt);
-            update(data.values, MeasurementToStateMatrix); // needs to take matrix
+            update(data.values, MeasurementToStateMatrix);
             Eigen::Vector3d estimation = send_result();
             (void)estimation;
         }
@@ -259,17 +257,20 @@ void Kalman::update_state_transition_matrix(double dt)
 
     // updates acceleration in position
     StateTransitionMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity(3, 3) * 0.5 * dt * dt;
+
+    //update rotation in acceleration'
+    StateTransitionMatrix.block<3, 3>(9, 6) = Eigen::Matrix3d::Identity(3, 3) * get_body_to_inertial_rotation(Eigen::Vector3d(0, 0, 0)); // need to get angles into the function
 }
 
 void Kalman::get_state_transition_matrix()
 {
     double initial_dt = 0.1;
-    StateTransitionMatrix = Eigen::MatrixXd::Identity(9, 9);
+    StateTransitionMatrix = Eigen::MatrixXd::Identity(12, 12);
     update_state_transition_matrix(initial_dt);
 }
 
 template <typename T>
-Eigen::MatrixXd integrate(const T &m, double start, double end, double steps)
+Eigen::MatrixXd integrate(const T &m, double start, double end)
 {
 
     /* Since for our model we can assume that noise is constant over the interval between measurements
@@ -283,7 +284,7 @@ Eigen::MatrixXd integrate(const T &m, double start, double end, double steps)
         }
     */
 
-    Eigen::MatrixXdres = m * (end - start);
+    Eigen::MatrixXd res = m * (end - start);
 
     return res;
 }
@@ -297,18 +298,19 @@ void Kalman::get_process_error_matrix()
     double noice_velocity = noice_acceleration * dt;
     double noise_position = variance_gps + noice_velocity + 0.5 * noice_acceleration * dt * dt;
 
-    ProcessErrorMatrix.block<3, 3>(0, 0) = Eigen::MatrixXd::Identity(3, 3) * noise_position;
-    ProcessErrorMatrix.block<3, 3>(3, 3) = Eigen::MatrixXd::Identity(3, 3) * noice_velocity;
-    ProcessErrorMatrix.block<3, 3>(6, 6) = Eigen::MatrixXd::Identity(3, 3) * noice_acceleration;
+    ProcessErrorMatrix.block<3, 3>(0, 0) *= noise_position;
+    ProcessErrorMatrix.block<3, 3>(3, 3) *= noice_velocity;
+    ProcessErrorMatrix.block<3, 3>(6, 6) *= noice_acceleration;
+    ProcessErrorMatrix.block<3, 3>(9, 9) *= variance_gyroscope;
     // integrate (Riemansum)
 }
 
 Kalman::Kalman(int port, std::string handshake) : client(port),
-                                                  StateTransitionMatrix(9, 9),
+                                                  StateTransitionMatrix(12, 12),
                                                   ProcessErrorMatrix(12, 12),
                                                   MeasurementNoiseMatrix(9, 9),
-                                                  ErrorCovarianceMatrix(9, 9),
-                                                  StateVector(9),
+                                                  ErrorCovarianceMatrix(12, 12),
+                                                  StateVector(12),
                                                   MeasurementVector(3),
                                                   initalized(false)
 {
@@ -317,11 +319,11 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
     get_state_transition_matrix();
     get_process_error_matrix();
 
-    ErrorCovarianceMatrix.setZero();
+    ErrorCovarianceMatrix.setIdentity();
 
-    MeasurementNoiseMatrix.block<3, 3>(0, 0) = Eigen::MatrixXd::Identity(3, 3) * variance_gps;
-    MeasurementNoiseMatrix.block<3, 3>(3, 3) = Eigen::MatrixXd::Identity(3, 3) * variance_accelerometer;
-    MeasurementNoiseMatrix.block<3, 3>(6, 6) = Eigen::MatrixXd::Identity(3, 3) * variance_gyroscope;
+    MeasurementNoiseMatrix.block<3, 3>(0, 0) *= variance_gps;
+    MeasurementNoiseMatrix.block<3, 3>(3, 3) *= variance_accelerometer;
+    MeasurementNoiseMatrix.block<3, 3>(6, 6) *= variance_gyroscope;
 
     last_update = std::chrono::steady_clock::now();
 }

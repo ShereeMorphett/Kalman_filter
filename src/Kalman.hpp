@@ -56,7 +56,8 @@ private:
     void get_state_transition_matrix();
     void update_state_transition_matrix(double dt);
     void get_process_error_matrix();
-    void get_mts_matrix(Type type);
+    Eigen::MatrixXd get_body_to_inertial_rotation(Eigen::Vector3d angles);
+    Eigen::MatrixXd get_mts_matrix(Type type);
 
     void predict(double dt);
     void update(Eigen::Vector3d measurement, Eigen::MatrixXd MeasurementToStateMatrix);
