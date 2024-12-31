@@ -52,7 +52,7 @@ private:
     MeasurementData parse_measurement(std::string str_buffer);
     MeasurementData parse_data(std::string str_buffer);
 
-    double get_time();
+    double get_dt();
     void get_state_transition_matrix();
     void update_state_transition_matrix(double dt);
     void get_process_error_matrix();

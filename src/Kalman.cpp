@@ -95,8 +95,7 @@ Kalman::MeasurementData Kalman::parse_data(std::string str_buffer)
             StateVector.segment<3>(3) = data.values;
             break;
         case Type::Direction:
-            // need to figure out transormation from euler angle to quaternion?
-            break;
+            data.values = get_body_to_inertial_rotation(data.values);
         default:
             break;
         }
@@ -156,9 +155,8 @@ Eigen::Vector3d Kalman::send_result()
               We then update the state vector with the new acceleration and the error covariance matrix
               and send the new estimation back to the server and do that for all incomming data.
         - Datatransfer:
-            x Need to confirm how data comes in. Are packages dropped, if we are not ready to receive?
-            - Do packages come individually or potentially in batch, like the first contact?
-        - I don't think we need the control input matrix. We could keep it in and set it to 0. If we do the initiailisation more
+            - Need to confirm how data comes in. Are packages dropped, if we are not ready to receive?
+        x I don't think we need the control input matrix. We could keep it in and set it to 0. If we do the initiailisation more
           modularly, this whole thing could be more flexible for whatever future use.
 */
 
@@ -184,11 +182,10 @@ Eigen::MatrixXd Kalman::get_mts_matrix(Type type)
     return MeasurementToStateMatrix;
 }
 
-double Kalman::get_time()
+double Kalman::get_dt()
 {
     auto current_time = std::chrono::steady_clock::now();
     double dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_update).count() / 1000.0; // in seconds
-    last_update = current_time;
     return dt;
 }
 
