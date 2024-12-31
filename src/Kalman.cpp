@@ -54,7 +54,6 @@ Eigen::Vector3d parse_eigen_vec3(std::istringstream &data)
 // Eigen::VectorXd X; // State vector (position, velocity) X(0): Position x. X(1): Position y.  X(2): Position  z. X(3): Velocity  x. X(4): Velocity  y.  X(5): Velocity  z.
 // Eigen::VectorXd Z; // Measurement vector (GPS position)
 
-
 Kalman::MeasurementData Kalman::parse_measurement(std::string str_buffer)
 {
     std::istringstream stream(str_buffer);
@@ -77,14 +76,14 @@ Kalman::MeasurementData Kalman::parse_measurement(std::string str_buffer)
     return data;
 }
 
-void Kalman::parse_data(std::string str_buffer)
+Kalman::MeasurementData Kalman::parse_data(std::string str_buffer)
 {
     std::string line;
     std::istringstream stream(str_buffer);
-
+    MeasurementData data;
     while (std::getline(stream, line))
     {
-        MeasurementData data = parse_measurement(str_buffer);
+        data = parse_measurement(str_buffer);
 
         switch (data.type)
         {
@@ -95,22 +94,23 @@ void Kalman::parse_data(std::string str_buffer)
             data.values *= 0.277778; // convert km/h to m/s
             StateVector.segment<3>(3) = data.values;
             break;
-            default:
-                break;
+        case Type::Direction:
+            // need to figure out transormation from euler angle to quaternion?
+            break;
+        default:
+            break;
         }
-        if (!initalized)
+        if (!initalized) // TODO: currently happens possible too early
         {
             initalized = true;
             // print_matrices();
         }
     }
+    return data;
 }
 
-void Kalman::update()
+void Kalman::update(Eigen::Vector3d measurement, Eigen::MatrixXd MeasurementToStateMatrix)
 {
-    // I want to pass the resprective measurement to state matrix with the respective measurement to update this.
-    //  Requires to compute the new matrix outside, the respective measurement comes in.
-
     Eigen::MatrixXd InnovationCov = MeasurementToStateMatrix * ErrorCovarianceMatrix * MeasurementToStateMatrix.transpose() + MeasurementNoiseMatrix;
     Eigen::MatrixXd KalmanGain = ErrorCovarianceMatrix * MeasurementNoiseMatrix.transpose() * InnovationCov.inverse();
 
@@ -122,15 +122,16 @@ void Kalman::predict(double dt)
 {
 
     // Update the state transition matrix F with the current time step
-    StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity() * dt;
+    StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity(3, 3) * dt;
+    StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity(3, 3) * dt;
 
-    StateVector = StateTransitionMatrix * StateVector; // Need to correct for the measurement specific state matrix
-
+    // Predict state: X = F * X
+    StateVector = StateTransitionMatrix * StateVector;
     // Predict covariance: P = F * P * F^T + Q
-    ErrorCovarianceMatrix = StateTransitionMatrix * ErrorCovarianceMatrix * StateTransitionMatrix.transpose() + ProcessErrorMatrix; // NEEd to think how this is influenced by the measurement. Do we even need a big state transition matrix anymore?
+    ErrorCovarianceMatrix = StateTransitionMatrix * ErrorCovarianceMatrix * StateTransitionMatrix.transpose() + ProcessErrorMatrix;
 }
 
-Eigen::Vector3d Kalman::calculate_estimation()
+Eigen::Vector3d Kalman::send_result()
 {
 
     std::stringstream ss;
@@ -148,19 +149,40 @@ Eigen::Vector3d Kalman::calculate_estimation()
 /* TODO:
     Current idea:
         - Implement the Kalman filter specific to measurements
-            - get rid of large measurement to state matrix
-            - instead implement measurement specific matrices that are produced on the spot, scaled by time for error
-            - can memoize the new values, if necessary (not sure if necessary yet)
-            - The idea is to have the loop continuously predict and update, when data comes in
-            - Eg we get a new acceleration measurement. We do the prediction as always
+            x get rid of large measurement to state matrix
+            - instead implement measurement specific matrices that are produced on the spot
+            x The idea is to have the loop continuously predict and update, when data comes in
+            x Eg we get a new acceleration measurement. We do the prediction as always
               We then update the state vector with the new acceleration and the error covariance matrix
               and send the new estimation back to the server and do that for all incomming data.
         - Datatransfer:
             - Need to confirm how data comes in. Are packages dropped, if we are not ready to receive?
-            - Do packages come individually or potentially in batch?
+            - Do packages come individually or potentially in batch, like the first contact?
         - I don't think we need the control input matrix. We could keep it in and set it to 0. If we do the initiailisation more
           modularly, this whole thing could be more flexible for whatever future use.
 */
+
+// could be a static function/ we don't need to create them everytime. Could be another lookup table
+void Kalman::get_mts_matrix(Type type)
+{
+    Eigen::MatrixXd MeasurementToStateMatrix = Eigen::MatrixXd::Zero(12, 3);
+    switch (type)
+    {
+    case Type::Direction:
+        MeasurementToStateMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity(3, 3);
+        break;
+    case Type::Acceleration:
+        MeasurementToStateMatrix.block<3, 3>(3, 0) = Eigen::Matrix3d::Identity(3, 3);
+        break;
+    case Type::Position:
+        MeasurementToStateMatrix.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(3, 3);
+        // include velocity correction
+        break;
+    default:
+        break;
+    }
+    return MeasurementToStateMatrix;
+}
 
 double Kalman::get_time()
 {
@@ -175,23 +197,25 @@ void Kalman::filter_loop()
     int sock_fd = client.get_sock_fd();
     sockaddr_in servaddr = client.get_servaddr();
     socklen_t len = client.get_sock_len();
+    MeasurementData data;
     while (true)
     {
         int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
                                 reinterpret_cast<struct sockaddr *>(&servaddr), &len);
         buffer[buff_len] = '\0';
         std::string str_buffer = buffer;
-        parse_data(buffer);
+        data = parse_data(buffer);
         double dt = get_time();
+        Eigen::MatrixXd MeasurementToStateMatrix = get_mts_matrix(data.type);
         // after parsing calculate the measurement to state matrix depending on the data.
         if (StateVector.size() != 0 && initalized)
         {
             // Always execute both, when data comes in
             // Need to decide, whether we want to continuously predict and report or only when measurement corrected report.
             predict(dt);
-            update(); // needs to take matrix
-            Eigen::Vector3d estimation = calculate_estimation();
-            (void) estimation;
+            update(data.values, MeasurementToStateMatrix); // needs to take matrix
+            Eigen::Vector3d estimation = send_result();
+            (void)estimation;
         }
     }
 }

@@ -41,8 +41,7 @@ private:
         {"SPEED", Type::Velocity},
         {"ACCELERATION", Type::Acceleration},
         {"DIRECTION", Type::Direction},
-        {"TRUE POSITION", Type::TruePosition}
-        };
+        {"TRUE POSITION", Type::TruePosition}};
 
     struct MeasurementData
     {
