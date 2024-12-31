@@ -220,23 +220,102 @@ void Kalman::filter_loop()
     }
 }
 
+Eigen::MatrixXd Kalman::get_body_to_inertial_rotation(Eigen::Vector3d angles)
+{
+    double sin_roll = sin(angles(0));
+    double cos_roll = cos(angles(0));
+    double sin_pitch = sin(angles(1));
+    double cos_pitch = cos(angles(1));
+    double sin_yaw = sin(angles(2));
+    double cos_yaw = cos(angles(2));
+
+    Eigen::Matrix3d r_roll {{ 1, 0, 0},
+                            {0, cos_roll, sin_roll},
+                            {0, -sin_roll, cos_roll}};
+
+    Eigen::Matrix3d r_pitch {{cos_pitch, 0, -sin_pitch},
+                            {0, 1, 0},
+                            {sin_pitch, 0, cos_pitch}};
+
+    Eigen::Matrix3d r_yaw {{cos_yaw, sin_yaw, 0},
+                            {-sin_yaw, cos_yaw, 0},
+                            {0, 0, 1}};
+
+    /*
+        As of now, I am faily confident we are in a rh coordinate system,
+        and we might be dealing with a 1-2-3 rotation sequence.
+        As in first roll, then pitch, then yaw. Which is not terribly common.
+        Based on the description in the subject, we should have actual euler angles
+        and not rates of change. So we should be able to use the above matrices.
+    */
+    return r_yaw * r_pitch * r_roll;
+}
+
+void Kalman::update_state_transition_matrix(double dt)
+{
+    // updates velocity in position and acceleration in velocity
+    StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity(3, 3) * dt;
+    StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity(3, 3) * dt;
+
+    // updates acceleration in position
+    StateTransitionMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity(3, 3) * 0.5 * dt * dt;
+}
+
+void Kalman::get_state_transition_matrix()
+{
+    double initial_dt = 0.1;
+    StateTransitionMatrix = Eigen::MatrixXd::Identity(9, 9);
+    update_state_transition_matrix(initial_dt);
+}
+
+template <typename T>
+Eigen::MatrixXd integrate(const T &m, double start, double end, double steps)
+{
+
+    /* Since for our model we can assume that noise is constant over the interval between measurements
+        and adds additively to our error, we can use a closed form solution to integrate the noise.
+
+        Eigen::MatrixXd res = Eigen::MatrixXd::Zero(m.rows(), m.cols());
+        double dt = (end - start) / steps;
+        for (int i = 0; i < steps; i++)
+        {
+            res += m * dt;
+        }
+    */
+
+    Eigen::MatrixXdres = m * (end - start);
+
+    return res;
+}
+
+void Kalman::get_process_error_matrix()
+{
+    ProcessErrorMatrix = Eigen::MatrixXd::Identity(12, 12);
+    double dt = 0.1;
+
+    double noice_acceleration = variance_accelerometer + 0.5 * variance_gyroscope * dt; // possibly (0.5*1/3)
+    double noice_velocity = noice_acceleration * dt;
+    double noise_position = variance_gps + noice_velocity + 0.5 * noice_acceleration * dt * dt;
+
+    ProcessErrorMatrix.block<3, 3>(0, 0) = Eigen::MatrixXd::Identity(3, 3) * noise_position;
+    ProcessErrorMatrix.block<3, 3>(3, 3) = Eigen::MatrixXd::Identity(3, 3) * noice_velocity;
+    ProcessErrorMatrix.block<3, 3>(6, 6) = Eigen::MatrixXd::Identity(3, 3) * noice_acceleration;
+    // integrate (Riemansum)
+}
+
 Kalman::Kalman(int port, std::string handshake) : client(port),
-                                                  StateTransitionMatrix(12, 12),
+                                                  StateTransitionMatrix(9, 9),
                                                   ProcessErrorMatrix(12, 12),
                                                   MeasurementNoiseMatrix(9, 9),
-                                                  ErrorCovarianceMatrix(12, 12),
-                                                  StateVector(12),
+                                                  ErrorCovarianceMatrix(9, 9),
+                                                  StateVector(9),
                                                   MeasurementVector(3),
                                                   initalized(false)
 {
     client.send_handshake(handshake);
 
-    StateTransitionMatrix.setIdentity();
-    StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity(3, 3);
-    StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity(3, 3);
-    // TODO: Influence of orientation is missing from the state transition matrix
-
-    ProcessErrorMatrix.setIdentity() * 1e-3;
+    get_state_transition_matrix();
+    get_process_error_matrix();
 
     ErrorCovarianceMatrix.setZero();
 

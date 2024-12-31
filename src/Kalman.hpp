@@ -50,16 +50,21 @@ private:
     };
 
     MeasurementData parse_measurement(std::string str_buffer);
+    MeasurementData parse_data(std::string str_buffer);
+
+    double get_time();
+    void get_state_transition_matrix();
+    void update_state_transition_matrix(double dt);
+    void get_process_error_matrix();
+    void get_mts_matrix(Type type);
+
+    void predict(double dt);
+    void update(Eigen::Vector3d measurement, Eigen::MatrixXd MeasurementToStateMatrix);
+    // void print_matrices();
+    Eigen::Vector3d send_result();
 
 public:
-    void extract_data(std::string server_data);
     void filter_loop();
-    void parse_data(std::string stream);
-    void predict(double dt);
-    void print_matrices();
-    void update();
-    double get_time();
-    Eigen::Vector3d calculate_estimation();
     Kalman(int port = 8080, std::string handshake = "READY");
     ~Kalman();
 };
