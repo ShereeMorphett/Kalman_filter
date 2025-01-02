@@ -99,11 +99,6 @@ Kalman::MeasurementData Kalman::parse_data(std::string str_buffer)
         default:
             break;
         }
-        if (!initalized) // TODO: currently happens possible too early
-        {
-            initalized = true;
-            // print_matrices();
-        }
     }
     return data;
 }
@@ -127,7 +122,7 @@ void Kalman::predict(double dt)
     // Predict state: X = F * X
     StateVector = StateTransitionMatrix * StateVector;
     // Predict covariance: P = F * P * F^T + Q
-    ErrorCovarianceMatrix = StateTransitionMatrix * ErrorCovarianceMatrix * StateTransitionMatrix.transpose() + ProcessErrorMatrix;
+    ErrorCovarianceMatrix = StateTransitionMatrix * ErrorCovarianceMatrix * StateTransitionMatrix.transpose() + ProcessErrorMatrix; //*dt?
 }
 
 Eigen::Vector3d Kalman::send_result()
@@ -251,8 +246,13 @@ void Kalman::filter_loop()
                                 reinterpret_cast<struct sockaddr *>(&servaddr), &len);
             if (buff_len < 0)
             {
-                // Process the received data
                 std::cout << "Error receiving message" << std::endl;
+            }
+            if (buff_len == 0)
+            {
+                std::cout << "Connection closed" << std::endl;
+                close(sock_fd);
+                break;
             }
             buffer[buff_len] = '\0';
             std::string str_buffer = buffer;
@@ -323,38 +323,18 @@ void Kalman::get_state_transition_matrix()
     update_state_transition_matrix(initial_dt);
 }
 
-template <typename T>
-Eigen::MatrixXd integrate(const T &m, double start, double end)
-{
-
-    /* Since for our model we can assume that noise is constant over the interval between measurements
-        and adds additively to our error, we can use a closed form solution to integrate the noise.
-
-        Eigen::MatrixXd res = Eigen::MatrixXd::Zero(m.rows(), m.cols());
-        double dt = (end - start) / steps;
-        for (int i = 0; i < steps; i++)
-        {
-            res += m * dt;
-        }
-    */
-
-    Eigen::MatrixXd res = m * (end - start);
-
-    return res;
-}
-
 void Kalman::get_process_error_matrix()
 {
     ProcessErrorMatrix = Eigen::MatrixXd::Identity(12, 12);
     double dt = 0.1;
 
-    double noice_acceleration = variance_accelerometer + 0.5 * variance_gyroscope * dt; // possibly (0.5*1/3)
-    double noice_velocity = noice_acceleration * dt;
-    double noise_position = variance_gps + noice_velocity + 0.5 * noice_acceleration * dt * dt;
+    double noise_acceleration = variance_accelerometer + 0.5 * variance_gyroscope * dt; // possibly (0.5*1/3)
+    double noise_velocity = noise_acceleration * dt;
+    double noise_position = variance_gps + noise_velocity + 0.5 * noise_acceleration * dt * dt;
 
     ProcessErrorMatrix.block<3, 3>(0, 0) *= noise_position;
-    ProcessErrorMatrix.block<3, 3>(3, 3) *= noice_velocity;
-    ProcessErrorMatrix.block<3, 3>(6, 6) *= noice_acceleration;
+    ProcessErrorMatrix.block<3, 3>(3, 3) *= noise_velocity;
+    ProcessErrorMatrix.block<3, 3>(6, 6) *= noise_acceleration;
     ProcessErrorMatrix.block<3, 3>(9, 9) *= variance_gyroscope;
     // integrate (Riemansum)
 }
@@ -369,6 +349,21 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
                                                   initalized(false)
 {
     client.send_handshake(handshake);
+
+    socklen_t len = client.get_sock_len();
+    for (int i = 0; i < 7; i++)
+    {
+        char buffer[MAXLINE];
+        int buff_len = recvfrom(client.get_sock_fd(), buffer, MAXLINE, MSG_WAITALL,
+                                reinterpret_cast<struct sockaddr *>(&client.get_servaddr()), &len);
+        if (buff_len < 0)
+        {
+            std::cerr << "Error receiving message" << std::endl;
+            exit(1);
+        }
+        MeasurementData data = parse_data(buffer);
+    }
+    initalized = true;
 
     get_state_transition_matrix();
     get_process_error_matrix();
