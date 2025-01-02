@@ -25,12 +25,11 @@ Eigen::Vector3d parse_eigen_vec3(std::istringstream &data)
     return point;
 }
 
-
 Kalman::MeasurementData Kalman::parse_measurement(std::string str_buffer)
 {
     std::istringstream stream(str_buffer);
     std::string line;
-            std::cout << "[server OG OUTPUT] " << str_buffer << std::endl;
+    std::cout << "[server OG OUTPUT] " << str_buffer << std::endl;
 
     std::regex capital_regex("([A-Z]+)");
     std::smatch match;
@@ -71,7 +70,7 @@ Kalman::MeasurementData Kalman::parse_data(std::string str_buffer)
         case Type::Direction:
             data.values = get_body_to_inertial_rotation(data.values);
         default:
-        // Velocity is scalar
+            // Velocity is scalar
             break;
         }
     }
@@ -140,7 +139,7 @@ Eigen::MatrixXd Kalman::get_mts_matrix(Type type)
         MeasurementToStateMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity(3, 3);
         // x_k = x_pred * (K) + (K - 1) * H * zk
         /*
-        */
+         */
         break;
     case Type::Acceleration:
         MeasurementToStateMatrix.block<3, 3>(3, 0) = Eigen::Matrix3d::Identity(3, 3);
@@ -148,30 +147,27 @@ Eigen::MatrixXd Kalman::get_mts_matrix(Type type)
     case Type::Position:
         MeasurementToStateMatrix.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(3, 3);
 
+        /* T(px py pz vx vy vz ax ay az roll pitch yaw ) = (1 0 0
+                                                            0 1 0
+                                                            0 0 1) * T(x y z)*/
 
-         /* T(px py pz vx vy vz ax ay az roll pitch yaw ) = (1 0 0 
-                                                             0 1 0
-                                                             0 0 1) * T(x y z)*/
+        /*
+        Acceleration
+           0 0 0
+           0 0 0
+           0 0 0
+           0 0 0
+           0 0 0
+           0 0 0
+           1 0 0
+           0 1 0
+           0 0 1
+           R_11 R_12 R_13
+           R_21 R_21 R_23
+           0 0 1
 
 
-     /*
-     Acceleration
-        0 0 0   
-        0 0 0 
-        0 0 0 
-        0 0 0 
-        0 0 0
-        0 0 0 
-        1 0 0
-        0 1 0
-        0 0 1
-        R_11 R_12 R_13
-        R_21 R_21 R_23
-        0 0 1
-
-        
-    */
-
+       */
 
         // include velocity correction
         break;
@@ -187,38 +183,6 @@ double Kalman::get_dt()
     double dt = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_update).count() / 1000.0; // in seconds
     return dt;
 }
-
-// void Kalman::filter_loop()
-// {
-//     int sock_fd = client.get_sock_fd();
-//     sockaddr_in servaddr = client.get_servaddr();
-//     socklen_t len = client.get_sock_len();
-//     MeasurementData data;
-//     while (true)
-//     {
-//         double dt = get_dt();
-//         predict(dt);
-//         // TODO: check if we can safely return to recvfrom if we're not waiting for data
-
-//         int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
-//                                 reinterpret_cast<struct sockaddr *>(&servaddr), &len);
-//         if (buff_len == -1)
-//         {
-//             std::cerr << "Error receiving data" << std::endl;
-//             continue;
-//         }
-//         buffer[buff_len] = '\0';
-//         std::string str_buffer = buffer;
-//         data = parse_data(buffer);
-//         if (StateVector.size() != 0 && initalized)
-//         {
-//             Eigen::MatrixXd MeasurementToStateMatrix = get_mts_matrix(data.type);
-//             update(data.values, MeasurementToStateMatrix);
-//             Eigen::Vector3d estimation = send_result();
-//             (void)estimation;
-//         }
-//     }
-// }
 
 void Kalman::filter_loop()
 {
@@ -299,7 +263,7 @@ Eigen::MatrixXd Kalman::get_body_to_inertial_rotation(Eigen::Vector3d angles)
         Based on the description in the subject, we should have actual euler angles
         and not rates of change. So we should be able to use the above matrices.
     */
-    return r_yaw * r_pitch * r_roll; //Possibly change
+    return r_yaw * r_pitch * r_roll; // Possibly change
 }
 
 void Kalman::update_state_transition_matrix(double dt)
@@ -318,7 +282,6 @@ void Kalman::update_state_transition_matrix(double dt)
         [x, y, z, vx, vy, vz, ax, ay, az, roll, pitch, yaw]
 
 */
-
 
 /*
     p_k = p_(k-1) + v_(k-1)*dt + 0.5*a_(k-1)*dt^2
