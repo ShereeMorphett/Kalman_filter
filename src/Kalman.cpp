@@ -25,40 +25,14 @@ Eigen::Vector3d parse_eigen_vec3(std::istringstream &data)
     return point;
 }
 
-// void Kalman::print_matrices()
-// {
-//     // Print matrices and vectors
-//     std::cout << "F (State transition matrix):\n"
-//               << F << "\n\n";
-//     std::cout << "B (Control input matrix):\n"
-//               << B << "\n\n";
-//     std::cout << "H (Measurement matrix):\n"
-//               << H << "\n\n";
-//     std::cout << "Q (Process noise covariance matrix):\n"
-//               << Q << "\n\n";
-//     std::cout << "R (Measurement noise covariance matrix):\n"
-//               << R << "\n\n";
-//     std::cout << "P (Error covariance matrix):\n"
-//               << P << "\n\n";
-//     std::cout << "X (State vector):\n"
-//               << X << "\n\n";
-//     std::cout << "Z (Measurement vector):\n"
-//               << Z << "\n\n";
-// }
-// Eigen::MatrixXd F; // State transition matrix
-// Eigen::MatrixXd B; // Control input matrix (acceleration)
-// Eigen::MatrixXd H; // Measurement matrix
-// Eigen::MatrixXd Q; // Process noise covariance matrix
-// Eigen::MatrixXd R; // Measurement noise covariance matrix
-// Eigen::MatrixXd P; // Error covariance matrix
-// Eigen::VectorXd X; // State vector (position, velocity) X(0): Position x. X(1): Position y.  X(2): Position  z. X(3): Velocity  x. X(4): Velocity  y.  X(5): Velocity  z.
-// Eigen::VectorXd Z; // Measurement vector (GPS position)
 
 Kalman::MeasurementData Kalman::parse_measurement(std::string str_buffer)
 {
     std::istringstream stream(str_buffer);
     std::string line;
-    std::regex capital_regex("[A-Z]+");
+            std::cout << "[server OG OUTPUT] " << str_buffer << std::endl;
+
+    std::regex capital_regex("([A-Z]+)");
     std::smatch match;
     MeasurementData data;
 
@@ -97,6 +71,7 @@ Kalman::MeasurementData Kalman::parse_data(std::string str_buffer)
         case Type::Direction:
             data.values = get_body_to_inertial_rotation(data.values);
         default:
+        // Velocity is scalar
             break;
         }
     }
@@ -117,12 +92,12 @@ void Kalman::predict(double dt)
 
     // Update the state transition matrix F with the current time step
     StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity(3, 3) * dt;
-    StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity(3, 3) * dt;
+    StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity(3, 3) * 0.5 * dt * dt;
 
     // Predict state: X = F * X
     StateVector = StateTransitionMatrix * StateVector;
     // Predict covariance: P = F * P * F^T + Q
-    ErrorCovarianceMatrix = StateTransitionMatrix * ErrorCovarianceMatrix * StateTransitionMatrix.transpose() + ProcessErrorMatrix; //*dt?
+    ErrorCovarianceMatrix = StateTransitionMatrix * ErrorCovarianceMatrix * StateTransitionMatrix.transpose() + ProcessErrorMatrix; // * dt;
 }
 
 Eigen::Vector3d Kalman::send_result()
@@ -163,12 +138,41 @@ Eigen::MatrixXd Kalman::get_mts_matrix(Type type)
     {
     case Type::Direction:
         MeasurementToStateMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity(3, 3);
+        // x_k = x_pred * (K) + (K - 1) * H * zk
+        /*
+        */
         break;
     case Type::Acceleration:
         MeasurementToStateMatrix.block<3, 3>(3, 0) = Eigen::Matrix3d::Identity(3, 3);
         break;
     case Type::Position:
         MeasurementToStateMatrix.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(3, 3);
+
+
+         /* T(px py pz vx vy vz ax ay az roll pitch yaw ) = (1 0 0 
+                                                             0 1 0
+                                                             0 0 1) * T(x y z)*/
+
+
+     /*
+     Acceleration
+        0 0 0   
+        0 0 0 
+        0 0 0 
+        0 0 0 
+        0 0 0
+        0 0 0 
+        1 0 0
+        0 1 0
+        0 0 1
+        R_11 R_12 R_13
+        R_21 R_21 R_23
+        0 0 1
+
+        
+    */
+
+
         // include velocity correction
         break;
     default:
@@ -184,37 +188,37 @@ double Kalman::get_dt()
     return dt;
 }
 
-void Kalman::filter_loop()
-{
-    int sock_fd = client.get_sock_fd();
-    sockaddr_in servaddr = client.get_servaddr();
-    socklen_t len = client.get_sock_len();
-    MeasurementData data;
-    while (true)
-    {
-        double dt = get_dt();
-        predict(dt);
-        // TODO: check if we can safely return to recvfrom if we're not waiting for data
+// void Kalman::filter_loop()
+// {
+//     int sock_fd = client.get_sock_fd();
+//     sockaddr_in servaddr = client.get_servaddr();
+//     socklen_t len = client.get_sock_len();
+//     MeasurementData data;
+//     while (true)
+//     {
+//         double dt = get_dt();
+//         predict(dt);
+//         // TODO: check if we can safely return to recvfrom if we're not waiting for data
 
-        int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
-                                reinterpret_cast<struct sockaddr *>(&servaddr), &len);
-        if (buff_len == -1)
-        {
-            std::cerr << "Error receiving data" << std::endl;
-            continue;
-        }
-        buffer[buff_len] = '\0';
-        std::string str_buffer = buffer;
-        data = parse_data(buffer);
-        if (StateVector.size() != 0 && initalized)
-        {
-            Eigen::MatrixXd MeasurementToStateMatrix = get_mts_matrix(data.type);
-            update(data.values, MeasurementToStateMatrix);
-            Eigen::Vector3d estimation = send_result();
-            (void)estimation;
-        }
-    }
-}
+//         int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
+//                                 reinterpret_cast<struct sockaddr *>(&servaddr), &len);
+//         if (buff_len == -1)
+//         {
+//             std::cerr << "Error receiving data" << std::endl;
+//             continue;
+//         }
+//         buffer[buff_len] = '\0';
+//         std::string str_buffer = buffer;
+//         data = parse_data(buffer);
+//         if (StateVector.size() != 0 && initalized)
+//         {
+//             Eigen::MatrixXd MeasurementToStateMatrix = get_mts_matrix(data.type);
+//             update(data.values, MeasurementToStateMatrix);
+//             Eigen::Vector3d estimation = send_result();
+//             (void)estimation;
+//         }
+//     }
+// }
 
 void Kalman::filter_loop()
 {
@@ -225,8 +229,6 @@ void Kalman::filter_loop()
     socklen_t len = client.get_sock_len();
     MeasurementData data;
     double dt;
-
-    MeasurementData data;
     int buff_len;
     while (true)
     {
@@ -238,7 +240,8 @@ void Kalman::filter_loop()
         timeout.tv_usec = 0;
 
         int activity = select(sock_fd + 1, &sock_fds, nullptr, nullptr, &timeout);
-
+        dt = get_dt();
+        predict(dt);
         if (activity > 0 && FD_ISSET(sock_fd, &sock_fds))
         {
             // Data is available to read
@@ -261,14 +264,10 @@ void Kalman::filter_loop()
             {
                 Eigen::MatrixXd MeasurementToStateMatrix = get_mts_matrix(data.type);
                 update(data.values, MeasurementToStateMatrix);
-                Eigen::Vector3d estimation = send_result();
-                (void)estimation;
             }
         }
-        // Perform the prediction step or other work
-        dt = get_dt();
-        predict(dt);
-        send_result();
+        Eigen::Vector3d estimation = send_result();
+        (void)estimation;
     }
 }
 
@@ -294,27 +293,54 @@ Eigen::MatrixXd Kalman::get_body_to_inertial_rotation(Eigen::Vector3d angles)
                           {0, 0, 1}};
 
     /*
-        As of now, I am faily confident we are in a rh coordinate system,
+        As of now, I am fairly confident we are in a rh coordinate system,
         and we might be dealing with a 1-2-3 rotation sequence.
-        As in first roll, then pitch, then yaw. Which is not terribly common.
+        As in first roll, then pitch, then yaw. Which is not terribly common. Could be first point of debug
         Based on the description in the subject, we should have actual euler angles
         and not rates of change. So we should be able to use the above matrices.
     */
-    return r_yaw * r_pitch * r_roll;
+    return r_yaw * r_pitch * r_roll; //Possibly change
 }
 
 void Kalman::update_state_transition_matrix(double dt)
 {
     // updates velocity in position and acceleration in velocity
-    StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity(3, 3) * dt;
-    StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity(3, 3) * dt;
+    StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity() * dt;
+    StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity() * dt;
 
     // updates acceleration in position
-    StateTransitionMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity(3, 3) * 0.5 * dt * dt;
-
-    // update rotation in acceleration
-    StateTransitionMatrix.block<3, 3>(9, 6) = Eigen::Matrix3d::Identity(3, 3) * StateVector.segment(9, 3);
+    StateTransitionMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity() * 0.5 * dt * dt;
 }
+
+/*
+    StateVector
+    As row vector:
+        [x, y, z, vx, vy, vz, ax, ay, az, roll, pitch, yaw]
+
+*/
+
+
+/*
+    p_k = p_(k-1) + v_(k-1)*dt + 0.5*a_(k-1)*dt^2
+    v_k = v_(k-1) + a_(k-1)*dt
+    a_k = a_(k-1) * R_(k-1)
+*/
+
+/*
+    StateMatrix:
+     1 0 0 dt 0 0 0.5*dt^2 0 0 0 0 0
+     0 1 0 0 dt 0 0 0.5*dt^2 0 0 0 0
+     0 0 1 0 0 dt 0 0 0.5*dt^2 0 0 0
+     0 0 0 1 0 0 dt 0 0 0 0 0
+     0 0 0 0 1 0 0 dt 0 0 0 0
+     0 0 0 0 0 1 0 0 dt 0 0 0
+     0 0 0 0 0 0 1 0 0 R_11 R_12 R_13
+     0 0 0 0 0 0 0 1 0 R_21 R_22 R_23
+     0 0 0 0 0 0 0 0 1 R_31 R_32 R_33
+     0 0 0 0 0 0 0 0 0 1 0 0
+     0 0 0 0 0 0 0 0 0 0 1 0
+     0 0 0 0 0 0 0 0 0 0 0 1
+     */
 
 void Kalman::get_state_transition_matrix()
 {
@@ -332,7 +358,7 @@ void Kalman::get_process_error_matrix()
     double noise_velocity = noise_acceleration * dt;
     double noise_position = variance_gps + noise_velocity + 0.5 * noise_acceleration * dt * dt;
 
-    ProcessErrorMatrix.block<3, 3>(0, 0) *= noise_position;
+    ProcessErrorMatrix.block<3, 3>(0, 0) *= noise_position; // integrate (Riemansum)
     ProcessErrorMatrix.block<3, 3>(3, 3) *= noise_velocity;
     ProcessErrorMatrix.block<3, 3>(6, 6) *= noise_acceleration;
     ProcessErrorMatrix.block<3, 3>(9, 9) *= variance_gyroscope;
@@ -351,11 +377,12 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
     client.send_handshake(handshake);
 
     socklen_t len = client.get_sock_len();
+    sockaddr_in servaddr = client.get_servaddr();
     for (int i = 0; i < 7; i++)
     {
         char buffer[MAXLINE];
         int buff_len = recvfrom(client.get_sock_fd(), buffer, MAXLINE, MSG_WAITALL,
-                                reinterpret_cast<struct sockaddr *>(&client.get_servaddr()), &len);
+                                reinterpret_cast<struct sockaddr *>(&servaddr), &len);
         if (buff_len < 0)
         {
             std::cerr << "Error receiving message" << std::endl;

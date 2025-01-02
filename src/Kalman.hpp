@@ -18,7 +18,7 @@ private:
     Eigen::Vector3d acceleration;
     Eigen::MatrixXd StateTransitionMatrix;    // State transition matrix  -
     Eigen::MatrixXd ControlInputMatrix;       // Control input matrix (acceleration)  - U NOT NECESSARY
-    Eigen::MatrixXd MeasurementToStateMatrix; // Measurement matrix  -
+    Eigen::MatrixXd MeasurementToStateMatrix; // Measurement matrix  - H
     Eigen::MatrixXd ProcessErrorMatrix;       // Process noise covariance matrix  -
     Eigen::MatrixXd MeasurementNoiseMatrix;   // Measurement noise covariance matrix  -
     Eigen::MatrixXd ErrorCovarianceMatrix;    // Error covariance matrix  -
