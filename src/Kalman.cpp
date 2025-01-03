@@ -287,19 +287,20 @@ Eigen::MatrixXd Kalman::get_body_to_inertial_rotation(Eigen::Vector3d angles)
 void Kalman::set_state_transition_matrix()
 {
     double dt = 0.1;
-    StateTransitionMatrix = Eigen::MatrixXd::Identity(12, 12);
+    StateTransitionMatrix.setIdentity(12, 12);
 
     // updates velocity in position and acceleration in velocity
     StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity() * dt;
     StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity() * dt;
 
     // updates acceleration in position
-    StateTransitionMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity() * 0.5 * dt * dt;
+    StateTransitionMatrix.block<3, 3>(0, 6) = Eigen::Matrix3d::Identity() * 0.5 * dt * dt;
+    std::cout << StateTransitionMatrix << std::endl;
 }
 
 void Kalman::set_process_error_matrix()
 {
-    ProcessErrorMatrix = Eigen::MatrixXd::Identity(12, 12);
+    ProcessErrorMatrix.setIdentity(12, 12);
     double dt = 0.1;
 
     double noise_acceleration = variance_accelerometer + 0.5 * variance_gyroscope * dt; // possibly (0.5*1/3)
@@ -310,10 +311,11 @@ void Kalman::set_process_error_matrix()
     ProcessErrorMatrix.block<3, 3>(3, 3) *= noise_velocity;
     ProcessErrorMatrix.block<3, 3>(6, 6) *= noise_acceleration;
     ProcessErrorMatrix.block<3, 3>(9, 9) *= variance_gyroscope;
-    // integrate (Riemansum)
+    std::cout << ProcessErrorMatrix << std::endl;
 }
 
-void Kalman::set_measurement_to_state_matrix(){
+void Kalman::set_measurement_to_state_matrix()
+{
     MeasurementToStateMatrix.setZero(12, 3);
     // GPS
     MeasurementToStateMatrix.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(3, 3);
@@ -321,8 +323,8 @@ void Kalman::set_measurement_to_state_matrix(){
     MeasurementToStateMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity(3, 3);
     // Gyroscope
     MeasurementToStateMatrix.block<3, 3>(9, 0) = Eigen::Matrix3d::Identity(3, 3);
+    std::cout << MeasurementToStateMatrix << std::endl;
 }
-
 
 Kalman::Kalman(int port, std::string handshake) : client(port),
                                                   StateTransitionMatrix(12, 12),
