@@ -185,16 +185,17 @@ void Kalman::filter_loop()
     MeasurementData data;
     double dt;
     int buff_len;
-    // FD_ZERO(&sock_fds);
-    // FD_SET(sock_fd, &sock_fds);
+    FD_ZERO(&sock_fds);
+    FD_SET(sock_fd, &sock_fds);
 
     while (true)
     {
-        // int activity = select(sock_fd + 1, &sock_fds, nullptr, nullptr, &timeout);
+        int activity = select(sock_fd + 1, &sock_fds, nullptr, nullptr, &timeout);
         dt = get_dt();
+        update_state_transition_matrix(dt, data);
         predict(dt);
-        // if (activity > 0 && FD_ISSET(sock_fd, &sock_fds))
-        // {
+        if (activity > 0 && FD_ISSET(sock_fd, &sock_fds))
+        {
             buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
                                 reinterpret_cast<struct sockaddr *>(&servaddr), &len);
             if (buff_len < 0)
@@ -215,13 +216,12 @@ void Kalman::filter_loop()
             if (StateVector.size() != 0 && initalized)
             {
                 set_measurement_vector(data);
-                update_state_transition_matrix(dt, data);
                 update();
                 last_update = std::chrono::steady_clock::now();
             }
         }
         send_result();
-    // }
+    }
 }
 
 Eigen::MatrixXd Kalman::get_body_to_inertial_rotation(Eigen::Vector3d angles)
@@ -265,7 +265,17 @@ Eigen::MatrixXd Kalman::get_body_to_inertial_rotation(Eigen::Vector3d angles)
 
 /*
     p_k = p_(k-1) + v_(k-1)*dt + 0.5*a_(k-1)*dt^2
-    v_k = v_(k-1) + a_(k-1)*dt
+    v_k = v_(k-1) + a_(k-1)*dt0.000000000000000 0.000000000000000 0.000000000000000
+0.000000000000000 0.000000000000000 0.000000000000000
+0.000000000000000 0.000000000000000 0.000000000000000
+1.000000000000000 0.000000000000000 0.000000000000000
+0.000000000000000 1.000000000000000 0.000000000000000
+0.000000000000000 0.000000000000000 1.000000000000000
+1.000000000000000 0.000000000000000 0.000000000000000
+0.000000000000000 1.000000000000000 0.000000000000000
+0.000000000000000 0.000000000000000 1.000000000000000
+^C
+
     a_k = a_(k-1) * R_(k-1)
 */
 
@@ -373,6 +383,7 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
     socklen_t len = client.get_sock_len();
     sockaddr_in servaddr = client.get_servaddr();
     std::string str_buffer = "";
+    std::cout << "SOCKET" << client.get_sock_fd() << std::endl;
 
     while (str_buffer.find("MSG_END") == std::string::npos)
     {
