@@ -41,25 +41,20 @@ private:
         TruePosition
     };
 
-    std::vector<std::pair<std::string, Type>> type_map = {
-        {"TRUE POSITION", Type::TruePosition},
-        {"POSITION", Type::Position},
-        {"SPEED", Type::Velocity},
-        {"ACCELERATION", Type::Acceleration},
-        {"DIRECTION", Type::Direction}};
-
     struct MeasurementData
     {
         Eigen::Vector3d values;
         Type type;
     };
 
-    MeasurementData parse_measurement(std::string str_buffer);
+    MeasurementData last_orientation;
+    MeasurementData parse_eigen_vec3(std::istringstream &data, Kalman::Type type);
     MeasurementData parse_data(std::string str_buffer);
+    void process_data(MeasurementData data);
 
     double get_dt();
     void set_state_transition_matrix();
-    void update_state_transition_matrix(double dt);
+    void update_state_transition_matrix(double dt, MeasurementData data);
     void set_process_error_matrix();
     Eigen::MatrixXd get_body_to_inertial_rotation(Eigen::Vector3d angles);
     void set_measurement_vector(MeasurementData &data);
