@@ -41,12 +41,12 @@ private:
         TruePosition
     };
 
-    std::map<std::string, Type> type_map = {
+    std::vector<std::pair<std::string, Type>> type_map = {
+        {"TRUE POSITION", Type::TruePosition},
         {"POSITION", Type::Position},
         {"SPEED", Type::Velocity},
         {"ACCELERATION", Type::Acceleration},
-        {"DIRECTION", Type::Direction},
-        {"TRUE POSITION", Type::TruePosition}};
+        {"DIRECTION", Type::Direction}};
 
     struct MeasurementData
     {

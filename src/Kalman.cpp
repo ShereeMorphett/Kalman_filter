@@ -21,27 +21,20 @@ Eigen::Vector3d parse_eigen_vec3(std::istringstream &data)
     return point;
 }
 
-
 Kalman::MeasurementData Kalman::parse_measurement(std::string str_buffer)
 {
     std::istringstream stream(str_buffer);
     std::string line;
-            std::cout << "[server OG OUTPUT] " << str_buffer << std::endl;
-
-    std::regex capital_regex("([A-Z]+)");
-    std::smatch match;
+    std::cout << "[server OG OUTPUT] " << str_buffer << std::endl;
     MeasurementData data;
-
+    std::string type = str_buffer.substr(0, str_buffer.find(":"));
+    size_t i = 0;
     while (std::getline(stream, line))
     {
-        if (std::regex_search(line, match, capital_regex))
-        {
-            std::string capital_letters = match.str(0);
-            std::cout << "[server] " << capital_letters << ":" << std::endl;
-            data.values = parse_eigen_vec3(stream);
-            std::cout << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
-            data.type = type_map[capital_letters];
-        }
+        // std::cout << "[server] " << type << ":" << std::endl;
+        data.values = parse_eigen_vec3(stream);
+        // std::cout << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
+        // find the right type for data
     }
     return data;
 }
@@ -120,7 +113,6 @@ void Kalman::send_result()
 {
 
     std::stringstream ss;
-    Eigen::Vector3d last_position = StateVector.segment<3>(0);
     ss << std::fixed << std::setprecision(15)
        << StateVector(0) << " " << StateVector(1) << " " << StateVector(2);
     std::string estimation = ss.str();
@@ -346,6 +338,8 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
 
     socklen_t len = client.get_sock_len();
     sockaddr_in servaddr = client.get_servaddr();
+    std::string str_buffer;
+
     for (int i = 0; i < 7; i++)
     {
         char buffer[MAXLINE];
@@ -357,10 +351,20 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
             exit(1);
         }
         buffer[buff_len] = '\0';
-        MeasurementData data = parse_data(buffer);
+        str_buffer = buffer;
+        for (auto [key, value] : type_map)
+        {
+            if (str_buffer.find(key) != std::string::npos)
+            {
+                MeasurementData data = parse_data(str_buffer);
+                (void)data;
+                break;
+            }
+        }
     }
     initalized = true;
 
+    std::cout << StateVector << std::endl;
     set_state_transition_matrix();
     set_process_error_matrix();
 
@@ -371,7 +375,7 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
     MeasurementNoiseMatrix.block<3, 3>(6, 6) *= variance_gyroscope;
 
     set_measurement_to_state_matrix();
-    
+
     last_update = std::chrono::steady_clock::now();
 }
 
