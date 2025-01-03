@@ -116,7 +116,7 @@ void Kalman::predict(double dt)
     ErrorCovarianceMatrix = StateTransitionMatrix * ErrorCovarianceMatrix * StateTransitionMatrix.transpose() + ProcessErrorMatrix; // * dt;
 }
 
-Eigen::Vector3d Kalman::send_result()
+void Kalman::send_result()
 {
 
     std::stringstream ss;
@@ -127,8 +127,6 @@ Eigen::Vector3d Kalman::send_result()
     std::cout << std::fixed << std::setprecision(15) << "ESTIMATION SENT:  " << estimation << std::endl;
 
     client.send_estimation(estimation);
-
-    return last_position;
 }
 
 /* TODO:
@@ -187,7 +185,7 @@ double Kalman::get_dt()
 
 void Kalman::filter_loop()
 {
-    struct timeval timeout;
+    struct timeval timeout = {0};
     fd_set sock_fds;
     int sock_fd = client.get_sock_fd();
     sockaddr_in servaddr = client.get_servaddr();
@@ -195,26 +193,23 @@ void Kalman::filter_loop()
     MeasurementData data;
     double dt;
     int buff_len;
+    FD_ZERO(&sock_fds);
+    FD_SET(sock_fd, &sock_fds);
+
     while (true)
     {
-        FD_ZERO(&sock_fds);
-        FD_SET(sock_fd, &sock_fds);
-
-        // Set timeout to 0 for non-blocking check
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 0;
-
         int activity = select(sock_fd + 1, &sock_fds, nullptr, nullptr, &timeout);
         dt = get_dt();
         predict(dt);
         if (activity > 0 && FD_ISSET(sock_fd, &sock_fds))
         {
-            // Data is available to read
             buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
                                 reinterpret_cast<struct sockaddr *>(&servaddr), &len);
             if (buff_len < 0)
             {
                 std::cout << "Error receiving message" << std::endl;
+                close(sock_fd);
+                exit(1);
             }
             if (buff_len == 0)
             {
@@ -297,14 +292,20 @@ Eigen::MatrixXd Kalman::get_body_to_inertial_rotation(Eigen::Vector3d angles)
      0 0 0 0 0 0 0 0 0 0 0 1
      */
 
-void Kalman::get_state_transition_matrix()
+void Kalman::set_state_transition_matrix()
 {
-    double initial_dt = 0.1;
+    double dt = 0.1;
     StateTransitionMatrix = Eigen::MatrixXd::Identity(12, 12);
-    update_state_transition_matrix(initial_dt);
+
+    // updates velocity in position and acceleration in velocity
+    StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity() * dt;
+    StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity() * dt;
+
+    // updates acceleration in position
+    StateTransitionMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity() * 0.5 * dt * dt;
 }
 
-void Kalman::get_process_error_matrix()
+void Kalman::set_process_error_matrix()
 {
     ProcessErrorMatrix = Eigen::MatrixXd::Identity(12, 12);
     double dt = 0.1;
@@ -344,12 +345,13 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
             std::cerr << "Error receiving message" << std::endl;
             exit(1);
         }
+        buffer[buff_len] = '\0';
         MeasurementData data = parse_data(buffer);
     }
     initalized = true;
 
-    get_state_transition_matrix();
-    get_process_error_matrix();
+    set_state_transition_matrix();
+    set_process_error_matrix();
 
     ErrorCovarianceMatrix.setIdentity();
 
