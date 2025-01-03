@@ -58,16 +58,15 @@ private:
     MeasurementData parse_data(std::string str_buffer);
 
     double get_dt();
-    void get_state_transition_matrix();
+    void set_state_transition_matrix();
     void update_state_transition_matrix(double dt);
-    void get_process_error_matrix();
+    void set_process_error_matrix();
     Eigen::MatrixXd get_body_to_inertial_rotation(Eigen::Vector3d angles);
-    Eigen::MatrixXd get_mts_matrix(Type type);
+    void set_measurement_vector(MeasurementData &data);
 
     void predict(double dt);
-    void update(Eigen::Vector3d measurement, Eigen::MatrixXd MeasurementToStateMatrix);
-    // void print_matrices();
-    Eigen::Vector3d send_result();
+    void update();
+    void send_result();
 
 public:
     void filter_loop();

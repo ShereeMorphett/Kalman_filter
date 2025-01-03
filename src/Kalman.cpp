@@ -67,15 +67,35 @@ Kalman::MeasurementData Kalman::parse_data(std::string str_buffer)
         case Type::Direction:
             data.values = get_body_to_inertial_rotation(data.values);
         default:
-        // Velocity is scalar
+            // Velocity is scalar
             break;
         }
     }
     return data;
 }
 
-void Kalman::update(Eigen::Vector3d measurement, Eigen::MatrixXd MeasurementToStateMatrix)
+void Kalman::set_measurement_vector(MeasurementData &data)
 {
+    MeasurementVector.setZero();
+    switch (data.type)
+    {
+    case Type::Position:
+        MeasurementVector.segment<3>(0) = data.values;
+        break;
+    case Type::Acceleration:
+        MeasurementVector.segment<3>(6) = data.values;
+        break;
+    case Type::Direction:
+        MeasurementVector.segment<3>(9) = data.values;
+        break;
+    default:
+        break;
+    }
+}
+
+void Kalman::update()
+{
+
     Eigen::MatrixXd InnovationCov = MeasurementToStateMatrix * ErrorCovarianceMatrix * MeasurementToStateMatrix.transpose() + MeasurementNoiseMatrix;
     Eigen::MatrixXd KalmanGain = ErrorCovarianceMatrix * MeasurementNoiseMatrix.transpose() * InnovationCov.inverse();
 
@@ -125,57 +145,6 @@ Eigen::Vector3d Kalman::send_result()
         x I don't think we need the control input matrix. We could keep it in and set it to 0. If we do the initiailisation more
           modularly, this whole thing could be more flexible for whatever future use.
 */
-
-// could be a static function/ we don't need to create them everytime. Could be another lookup table
-Eigen::MatrixXd Kalman::get_mts_matrix(Type type)
-{
-    Eigen::MatrixXd MeasurementToStateMatrix = Eigen::MatrixXd::Zero(12, 3);
-    switch (type)
-    {
-    case Type::Direction:
-        MeasurementToStateMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity(3, 3);
-        // x_k = x_pred * (K) + (K - 1) * H * zk
-        /*
-        */
-        break;
-    case Type::Acceleration:
-        MeasurementToStateMatrix.block<3, 3>(3, 0) = Eigen::Matrix3d::Identity(3, 3);
-        break;
-    case Type::Position:
-        MeasurementToStateMatrix.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(3, 3);
-
-
-         /* T(px py pz vx vy vz ax ay az roll pitch yaw ) = (1 0 0 
-                                                             0 1 0
-                                                             0 0 1) * T(x y z)*/
-
-
-     /*
-     Acceleration
-        0 0 0   
-        0 0 0 
-        0 0 0 
-        0 0 0 
-        0 0 0
-        0 0 0 
-        1 0 0
-        0 1 0
-        0 0 1
-        R_11 R_12 R_13
-        R_21 R_21 R_23
-        0 0 1
-
-        
-    */
-
-
-        // include velocity correction
-        break;
-    default:
-        break;
-    }
-    return MeasurementToStateMatrix;
-}
 
 double Kalman::get_dt()
 {
@@ -258,12 +227,12 @@ void Kalman::filter_loop()
             data = parse_data(buffer);
             if (StateVector.size() != 0 && initalized)
             {
-                Eigen::MatrixXd MeasurementToStateMatrix = get_mts_matrix(data.type);
-                update(data.values, MeasurementToStateMatrix);
+                set_measurement_vector(data);
+                update();
+                last_update = std::chrono::steady_clock::now();
             }
         }
-        Eigen::Vector3d estimation = send_result();
-        (void)estimation;
+        send_result();
     }
 }
 
@@ -292,20 +261,11 @@ Eigen::MatrixXd Kalman::get_body_to_inertial_rotation(Eigen::Vector3d angles)
         As of now, I am fairly confident we are in a rh coordinate system,
         and we might be dealing with a 1-2-3 rotation sequence.
         As in first roll, then pitch, then yaw. Which is not terribly common. Could be first point of debug
+        More common would be 3-2-1, which is yaw, pitch, roll (read from right to left).
         Based on the description in the subject, we should have actual euler angles
         and not rates of change. So we should be able to use the above matrices.
     */
-    return r_yaw * r_pitch * r_roll; //Possibly change
-}
-
-void Kalman::update_state_transition_matrix(double dt)
-{
-    // updates velocity in position and acceleration in velocity
-    StateTransitionMatrix.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity() * dt;
-    StateTransitionMatrix.block<3, 3>(3, 6) = Eigen::Matrix3d::Identity() * dt;
-
-    // updates acceleration in position
-    StateTransitionMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity() * 0.5 * dt * dt;
+    return r_yaw * r_pitch * r_roll; // Possibly switch yaw and roll
 }
 
 /*
@@ -314,7 +274,6 @@ void Kalman::update_state_transition_matrix(double dt)
         [x, y, z, vx, vy, vz, ax, ay, az, roll, pitch, yaw]
 
 */
-
 
 /*
     p_k = p_(k-1) + v_(k-1)*dt + 0.5*a_(k-1)*dt^2
@@ -365,9 +324,10 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
                                                   StateTransitionMatrix(12, 12),
                                                   ProcessErrorMatrix(12, 12),
                                                   MeasurementNoiseMatrix(9, 9),
+                                                  MeasurementToStateMatrix(12, 3),
                                                   ErrorCovarianceMatrix(12, 12),
                                                   StateVector(12),
-                                                  MeasurementVector(3),
+                                                  MeasurementVector(12),
                                                   initalized(false)
 {
     client.send_handshake(handshake);
@@ -396,6 +356,14 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
     MeasurementNoiseMatrix.block<3, 3>(0, 0) *= variance_gps;
     MeasurementNoiseMatrix.block<3, 3>(3, 3) *= variance_accelerometer;
     MeasurementNoiseMatrix.block<3, 3>(6, 6) *= variance_gyroscope;
+
+    MeasurementToStateMatrix.setZero(12, 3);
+    // GPS
+    MeasurementToStateMatrix.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(3, 3);
+    // Accelerometer
+    MeasurementToStateMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity(3, 3);
+    // Gyroscope
+    MeasurementToStateMatrix.block<3, 3>(9, 0) = Eigen::Matrix3d::Identity(3, 3);
 
     last_update = std::chrono::steady_clock::now();
 }
