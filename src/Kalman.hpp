@@ -15,6 +15,11 @@ private:
     unsigned int k; // current iteration of Kalman
     double speed;
     char buffer[MAXLINE];
+
+    const double variance_accelerometer = 1e-9; // 1e-3 * 1e-3
+    const double variance_gyroscope = 1e-4;     // 1e-2 * 1e-2
+    const double variance_gps = 1e-2;           // 1e-1 * 1e-1
+
     Eigen::Vector3d acceleration;
     Eigen::MatrixXd StateTransitionMatrix;    // State transition matrix  -
     Eigen::MatrixXd ControlInputMatrix;       // Control input matrix (acceleration)  - U NOT NECESSARY
