@@ -63,6 +63,7 @@ private:
     void set_process_error_matrix();
     Eigen::MatrixXd get_body_to_inertial_rotation(Eigen::Vector3d angles);
     void set_measurement_vector(MeasurementData &data);
+    void set_measurement_to_state_matrix();
 
     void predict(double dt);
     void update();

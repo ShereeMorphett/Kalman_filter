@@ -321,6 +321,17 @@ void Kalman::set_process_error_matrix()
     // integrate (Riemansum)
 }
 
+void Kalman::set_measurement_to_state_matrix(){
+    MeasurementToStateMatrix.setZero(12, 3);
+    // GPS
+    MeasurementToStateMatrix.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(3, 3);
+    // Accelerometer
+    MeasurementToStateMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity(3, 3);
+    // Gyroscope
+    MeasurementToStateMatrix.block<3, 3>(9, 0) = Eigen::Matrix3d::Identity(3, 3);
+}
+
+
 Kalman::Kalman(int port, std::string handshake) : client(port),
                                                   StateTransitionMatrix(12, 12),
                                                   ProcessErrorMatrix(12, 12),
@@ -359,14 +370,8 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
     MeasurementNoiseMatrix.block<3, 3>(3, 3) *= variance_accelerometer;
     MeasurementNoiseMatrix.block<3, 3>(6, 6) *= variance_gyroscope;
 
-    MeasurementToStateMatrix.setZero(12, 3);
-    // GPS
-    MeasurementToStateMatrix.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(3, 3);
-    // Accelerometer
-    MeasurementToStateMatrix.block<3, 3>(6, 0) = Eigen::Matrix3d::Identity(3, 3);
-    // Gyroscope
-    MeasurementToStateMatrix.block<3, 3>(9, 0) = Eigen::Matrix3d::Identity(3, 3);
-
+    set_measurement_to_state_matrix();
+    
     last_update = std::chrono::steady_clock::now();
 }
 
