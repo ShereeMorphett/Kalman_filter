@@ -74,18 +74,20 @@ void UDPClient::send_estimation(const std::string &estimation)
             std::cerr << COLOR_RED << "[Client] Error: Connection lost while sending estimation."
                       << COLOR_RESET << std::endl;
             close(sock_fd);
-            exit(1); // Handle disconnection gracefully
+            exit(1); // NOPE
         }
         else
         {
             perror("Error sending estimation");
             close(sock_fd);
-            exit(1);
+            exit(1); //NOPE
         }
     }
     else if (bytes_sent == 0)
     {
         std::cerr << COLOR_YELLOW << "[Client] Warning: No data was sent." << COLOR_RESET << std::endl;
+        close(sock_fd);
+        exit(1); //Nope
     }
     else
     {
