@@ -8,8 +8,10 @@
 #include <fcntl.h>
 #include <cstring>
 #include <iostream>
+#include "colour.hpp"
 
-Kalman::MeasurementData Kalman::parse_eigen_vec3(std::istringstream &data, Kalman::Type type)
+
+Kalman::MeasurementData Kalman::parse_eigen_vec3(std::istringstream& data, Kalman::Type type)
 {
     MeasurementData mes_data;
 
@@ -32,6 +34,7 @@ Kalman::MeasurementData Kalman::parse_eigen_vec3(std::istringstream &data, Kalma
 
     return mes_data;
 }
+
 Kalman::MeasurementData Kalman::parse_data(std::string str_buffer)
 {
     std::istringstream stream(str_buffer);
@@ -46,31 +49,32 @@ Kalman::MeasurementData Kalman::parse_data(std::string str_buffer)
         {
             data = parse_eigen_vec3(stream, Type::Acceleration);
 
-            std::cout << "[server] ACCELERATION: "
-                      << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
+            // std::cout << "[server] ACCELERATION: "
+            //     << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
         }
         else if (line.find("DIRECTION") != std::string::npos)
         {
             data = parse_eigen_vec3(stream, Type::Direction);
             last_orientation = data;
-            std::cout << "[server] DIRECTION: "
-                      << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
-            std::cout << "[server] UPDATED" << std::endl;
+            // std::cout << "[server] DIRECTION: "
+            //     << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
         }
         else if (line.find("TRUE POSITION") != std::string::npos)
         {
             data = parse_eigen_vec3(stream, Type::TruePosition);
 
-            std::cout << std::fixed << std::setprecision(15)
-                      << "[server] TRUE POSITION: "
-                      << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
+            true_position =
+                std::to_string(data.values(0)) + " " +
+                std::to_string(data.values(1)) + " " +
+                std::to_string(data.values(2));
+
         }
         else if (line.find("POSITION") != std::string::npos)
         {
             data = parse_eigen_vec3(stream, Type::Position);
             std::cout << std::fixed << std::setprecision(15)
-                      << "[server] POSITION: "
-                      << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
+                << "[server] POSITION: "
+                << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
         }
         else if (line.find("SPEED") != std::string::npos)
         {
@@ -81,14 +85,14 @@ Kalman::MeasurementData Kalman::parse_data(std::string str_buffer)
                 std::cout << "[server] SPEED: " << speed << " m/s" << std::endl;
                 std::cout << "[server] UPDATED" << std::endl;
                 data.type = Type::Velocity;
-                data.values = {speed, 0, 0};
+                data.values = { speed, 0, 0 };
             }
         }
     }
     return data;
 }
 
-void Kalman::set_measurement_vector(MeasurementData &data)
+void Kalman::set_measurement_vector(MeasurementData& data)
 {
     MeasurementVector.setZero();
     switch (data.type)
@@ -135,9 +139,9 @@ void Kalman::predict()
 {
     // Predict state: X = F * X
     StateVector = StateTransitionMatrix * StateVector;
-    std::cout << "STATE VECTOR: " << StateVector << std::endl;
-    std::cout << "----------------------------------------" << std::endl;
-    std::cout << std::setprecision(5) << StateTransitionMatrix << std::endl;
+    // std::cout << "STATE VECTOR: " << StateVector << std::endl;
+    // std::cout << "----------------------------------------" << std::endl;
+    // std::cout << std::setprecision(5) << StateTransitionMatrix << std::endl;
     // Predict covariance: P = F * P * F^T + Q
     ErrorCovarianceMatrix = StateTransitionMatrix * ErrorCovarianceMatrix * StateTransitionMatrix.transpose() + ProcessErrorMatrix; // * dt;
 }
@@ -147,7 +151,7 @@ void Kalman::send_result()
 
     std::stringstream ss;
     ss << std::fixed << std::setprecision(15)
-       << StateVector(0) << " " << StateVector(1) << " " << StateVector(2);
+        << StateVector(0) << " " << StateVector(1) << " " << StateVector(2);
     std::string estimation = ss.str();
     std::cout << std::fixed << std::setprecision(15) << "ESTIMATION SENT:  " << estimation << std::endl;
 
@@ -179,58 +183,73 @@ double Kalman::get_dt()
 void Kalman::filter_loop()
 {
     int sock_fd = client.get_sock_fd();
-    // sockaddr_in servaddr = client.get_servaddr();
-    // socklen_t len = client.get_sock_len();
+    struct timeval timeout;
+    fd_set sock_fds;
+
+    const int timeout_duration_sec = 1;
+    time_t last_activity = time(nullptr);
+
+    FD_ZERO(&sock_fds);
+    FD_SET(sock_fd, &sock_fds);
 
     MeasurementData data;
     double dt = 0.01;
+
+    char buffer[MAXLINE];
     int buff_len;
 
-    // struct timeval timeout = {0};
-    // fd_set sock_fds;
-    // FD_ZERO(&sock_fds);
-    // FD_SET(sock_fd, &sock_fds);
+    client.send_estimation(true_position); //todo: this needs to be done better
 
     while (true)
     {
-        // int activity = select(sock_fd + 1, &sock_fds, nullptr, nullptr, &timeout);
-        // std::cout << StateVector << std::endl;
-        // // dt = get_dt();
-        // if (activity > 0 && FD_ISSET(sock_fd, &sock_fds))
-        // {
-        std::cout << "SockFD: " << sock_fd << std::endl;
-        buff_len = recvfrom(sock_fd, buffer, MAXLINE, 0, // MSG_WAITALL does nothing for UDP
-                            NULL, NULL);                 // reinterpret_cast<struct sockaddr *>(&servaddr), &len); // could both be nullptr, cause connectionless
-        std::cout << "Message Recieved" << std::endl;
-        if (buff_len < 0)
+        timeout.tv_sec = timeout_duration_sec;
+        timeout.tv_usec = 0;
+
+        int activity = select(sock_fd + 1, &sock_fds, nullptr, nullptr, &timeout);
+
+        if (activity > 0) // Activity detected
         {
-            std::cout << "Error receiving message" << std::endl;
-            close(sock_fd);
-            exit(1); // NOPE
-        }
-        if (buff_len == 0)
-        {
-            if (errno == EWOULDBLOCK || errno == EAGAIN)
+            if (FD_ISSET(sock_fd, &sock_fds))
             {
-                std::cerr << "No data available (non-blocking mode)." << std::endl;
-                continue;
+                buff_len = recvfrom(sock_fd, buffer, MAXLINE, 0, NULL, NULL);
+                if (buff_len < 0)
+                {
+                    std::cerr << "Error receiving message." << std::endl;
+                    close(sock_fd);
+                    return;
+                }
+
+                buffer[buff_len] = '\0';
+                std::string str_buffer = buffer;
+
+                data = parse_data(buffer);
+                update_state_transition_matrix(dt, data);
+                // update();
+                predict();
+                set_measurement_vector(data);
+                last_activity = time(nullptr);
             }
-            std::cout << "Connection closed" << std::endl;
-            close(sock_fd);
-            exit(1); // NOPE
         }
-        buffer[buff_len] = '\0';
-        std::string str_buffer = buffer;
-        update_state_transition_matrix(dt, data);
-        predict();
-        data = parse_data(buffer);
-        update();
-        set_measurement_vector(data);
-        last_update = std::chrono::steady_clock::now();
+        else if (activity == 0) // Timeout occurred
+        {
+            time_t current_time = time(nullptr);
+            if (current_time - last_activity >= timeout_duration_sec)
+            {
+                std::cout << "Client disconnected due to inactivity." << std::endl;
+                close(sock_fd);
+                return;
+            }
+        }
+        else // Error occurred
+        {
+            std::cerr << "Error with select()." << std::endl;
+            close(sock_fd);
+            return;
+        }
         send_result();
     }
-    // }
 }
+
 
 Eigen::MatrixXd Kalman::get_body_to_inertial_rotation(Eigen::Vector3d angles)
 {
@@ -241,17 +260,17 @@ Eigen::MatrixXd Kalman::get_body_to_inertial_rotation(Eigen::Vector3d angles)
     double sin_yaw = sin(angles(2));
     double cos_yaw = cos(angles(2));
 
-    Eigen::Matrix3d r_roll{{1, 0, 0},
+    Eigen::Matrix3d r_roll{ {1, 0, 0},
                            {0, cos_roll, -sin_roll},
-                           {0, sin_roll, cos_roll}};
+                           {0, sin_roll, cos_roll} };
 
-    Eigen::Matrix3d r_pitch{{cos_pitch, 0, sin_pitch},
+    Eigen::Matrix3d r_pitch{ {cos_pitch, 0, sin_pitch},
                             {0, 1, 0},
-                            {-sin_pitch, 0, cos_pitch}};
+                            {-sin_pitch, 0, cos_pitch} };
 
-    Eigen::Matrix3d r_yaw{{cos_yaw, -sin_yaw, 0},
+    Eigen::Matrix3d r_yaw{ {cos_yaw, -sin_yaw, 0},
                           {sin_yaw, cos_yaw, 0},
-                          {0, 0, 1}};
+                          {0, 0, 1} };
 
     /*
         As of now, I am fairly confident we are in a rh coordinate system,
@@ -380,13 +399,13 @@ void Kalman::process_data(MeasurementData data)
 }
 
 Kalman::Kalman(int port, std::string handshake) : client(port),
-                                                  StateVector(12),
-                                                  StateTransitionMatrix(12, 12),
-                                                  ProcessErrorMatrix(12, 12),
-                                                  MeasurementNoiseMatrix(12, 12),
-                                                  MeasurementToStateMatrix(12, 3),
-                                                  ErrorCovarianceMatrix(12, 12),
-                                                  MeasurementVector(12)
+StateVector(12),
+StateTransitionMatrix(12, 12),
+ProcessErrorMatrix(12, 12),
+MeasurementNoiseMatrix(12, 12),
+MeasurementToStateMatrix(12, 3),
+ErrorCovarianceMatrix(12, 12),
+MeasurementVector(12)
 {
     client.send_handshake(handshake);
 
@@ -399,7 +418,7 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
     while (str_buffer.find("MSG_END") == std::string::npos)
     {
         int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
-                                reinterpret_cast<struct sockaddr *>(&servaddr), &len);
+            reinterpret_cast<struct sockaddr*>(&servaddr), &len);
         if (buff_len < 0)
         {
             std::cerr << "Error receiving message" << std::endl;
@@ -423,7 +442,6 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
     MeasurementNoiseMatrix.block<3, 3>(6, 6) *= variance_gyroscope;
 
     set_measurement_to_state_matrix();
-
     last_update = std::chrono::steady_clock::now();
 }
 

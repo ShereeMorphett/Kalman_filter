@@ -15,7 +15,7 @@ private:
     unsigned int k; // current iteration of Kalman
     double speed;
     char buffer[MAXLINE];
-
+    std::string true_position; //Todo: should this be here?
     const double variance_accelerometer = 1e-9; // 1e-3 * 1e-3
     const double variance_gyroscope = 1e-4;     // 1e-2 * 1e-2
     const double variance_gps = 1e-2;           // 1e-1 * 1e-1
@@ -47,7 +47,7 @@ private:
     };
 
     MeasurementData last_orientation;
-    MeasurementData parse_eigen_vec3(std::istringstream &data, Kalman::Type type);
+    MeasurementData parse_eigen_vec3(std::istringstream& data, Kalman::Type type);
     MeasurementData parse_data(std::string str_buffer);
     void process_data(MeasurementData data);
 
@@ -56,7 +56,7 @@ private:
     void update_state_transition_matrix(double dt, MeasurementData data);
     void set_process_error_matrix();
     Eigen::MatrixXd get_body_to_inertial_rotation(Eigen::Vector3d angles);
-    void set_measurement_vector(MeasurementData &data);
+    void set_measurement_vector(MeasurementData& data);
     void set_measurement_to_state_matrix();
 
     void predict();
