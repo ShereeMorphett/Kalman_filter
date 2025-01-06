@@ -41,7 +41,7 @@ Kalman::MeasurementData Kalman::parse_data(std::string str_buffer)
     std::string line;
     MeasurementData data;
 
-    std::cout << "BUFFER: " << str_buffer << std::endl;
+    // std::cout << "BUFFER: " << str_buffer << std::endl;
 
     while (std::getline(stream, line))
     {
@@ -49,15 +49,15 @@ Kalman::MeasurementData Kalman::parse_data(std::string str_buffer)
         {
             data = parse_eigen_vec3(stream, Type::Acceleration);
 
-            // std::cout << "[server] ACCELERATION: "
-            //     << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
+            std::cout << "[server] ACCELERATION: "
+                << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
         }
         else if (line.find("DIRECTION") != std::string::npos)
         {
             data = parse_eigen_vec3(stream, Type::Direction);
             last_orientation = data;
-            // std::cout << "[server] DIRECTION: "
-            //     << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
+            std::cout << "[server] DIRECTION: "
+                << data.values(0) << ", " << data.values(1) << ", " << data.values(2) << std::endl;
         }
         else if (line.find("TRUE POSITION") != std::string::npos)
         {
@@ -209,7 +209,10 @@ void Kalman::filter_loop()
 
         if (activity > 0) // Activity detected
         {
-            if (FD_ISSET(sock_fd, &sock_fds))
+            std::string accumulated_message;
+            bool end_message_received = false;
+
+            while (!end_message_received)
             {
                 buff_len = recvfrom(sock_fd, buffer, MAXLINE, 0, NULL, NULL);
                 if (buff_len < 0)
@@ -220,15 +223,25 @@ void Kalman::filter_loop()
                 }
 
                 buffer[buff_len] = '\0';
-                std::string str_buffer = buffer;
+                std::string str_buffer = buffer; // STATIC CAST OR SOMETHING
 
-                data = parse_data(buffer);
-                update_state_transition_matrix(dt, data);
-                // update();
-                predict();
-                set_measurement_vector(data);
-                last_activity = time(nullptr);
+                accumulated_message += str_buffer;
+
+                // Check for MSG_END in the received buffer
+                if (str_buffer.find("MSG_END") != std::string::npos)
+                {
+                    end_message_received = true;
+                }
             }
+
+            // Process the accumulated message
+            data = parse_data(accumulated_message.c_str());
+            update_state_transition_matrix(dt, data);
+            predict();
+            // update();
+
+            set_measurement_vector(data);
+            last_activity = time(nullptr);
         }
         else if (activity == 0) // Timeout occurred
         {

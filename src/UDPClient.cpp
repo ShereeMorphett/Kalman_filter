@@ -45,7 +45,7 @@ UDPClient::~UDPClient()
 void UDPClient::send_handshake(std::string handshake)
 {
     sendto(sock_fd, handshake.c_str(), handshake.length(), MSG_CONFIRM,
-        reinterpret_cast<const struct sockaddr*>(&servaddr), sizeof(servaddr));
+           reinterpret_cast<const struct sockaddr *>(&servaddr), sizeof(servaddr));
     std::cout << "Client: Handshake message sent." << std::endl;
 }
 
@@ -62,46 +62,37 @@ sockaddr_in UDPClient::get_servaddr()
     return servaddr;
 };
 
-void UDPClient::send_estimation(const std::string& estimation)
+void UDPClient::send_estimation(const std::string &estimation)
 {
-    ssize_t bytes_sent = sendto(sock_fd, estimation.c_str(), estimation.length(), 0,
-        reinterpret_cast<const struct sockaddr*>(&servaddr), sizeof(servaddr));
+    ssize_t bytes_sent = sendto(sock_fd, estimation.c_str(), estimation.length(), MSG_CONFIRM,
+                                reinterpret_cast<const struct sockaddr *>(&servaddr), sizeof(servaddr));
 
     if (bytes_sent < 0)
     {
-#ifdef _WIN32
-        int error_code = WSAGetLastError();
-        if (error_code == WSAECONNRESET || error_code == WSAEPIPE)
-#else
         if (errno == EPIPE || errno == ECONNRESET)
-#endif
         {
             std::cerr << COLOR_RED << "[Client] Error: Connection lost while sending estimation."
-                << COLOR_RESET << std::endl;
-            CLOSE_SOCKET(sock_fd);
-            exit(1);
+                      << COLOR_RESET << std::endl;
+            close(sock_fd);
+            exit(1); // NOPE
         }
         else
         {
-#ifdef _WIN32
-            std::cerr << "Error sending estimation: " << error_code << std::endl;
-#else
             perror("Error sending estimation");
-#endif
-            CLOSE_SOCKET(sock_fd);
-            exit(1);
+            close(sock_fd);
+            exit(1); //NOPE
         }
     }
     else if (bytes_sent == 0)
     {
         std::cerr << COLOR_YELLOW << "[Client] Warning: No data was sent." << COLOR_RESET << std::endl;
-        CLOSE_SOCKET(sock_fd);
-        exit(1);
+        close(sock_fd);
+        exit(1); //Nope
     }
     else
     {
         msg_sent++;
         std::cout << COLOR_GREEN << "[Client] Position [" << msg_sent << "] estimation sent.\n"
-            << COLOR_RESET << std::endl;
+                  << COLOR_RESET << std::endl;
     }
 }

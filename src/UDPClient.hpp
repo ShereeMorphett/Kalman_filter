@@ -7,15 +7,11 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <windows.h>
-typedef int ssize_t; // Define ssize_t for Windows
 #define close closesocket
 #define MSG_CONFIRM 0
 #else
-#include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-#define CLOSE_SOCKET close
 #endif
 
 class UDPClient
