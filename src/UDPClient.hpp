@@ -15,6 +15,7 @@ typedef int ssize_t; // Define ssize_t for Windows
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#define CLOSE_SOCKET close
 #endif
 
 class UDPClient
