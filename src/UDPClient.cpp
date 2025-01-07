@@ -64,35 +64,9 @@ sockaddr_in UDPClient::get_servaddr()
 
 void UDPClient::send_estimation(const std::string &estimation)
 {
-    ssize_t bytes_sent = sendto(sock_fd, estimation.c_str(), estimation.length(), MSG_CONFIRM,
-                                reinterpret_cast<const struct sockaddr *>(&servaddr), sizeof(servaddr));
-
-    if (bytes_sent < 0)
-    {
-        if (errno == EPIPE || errno == ECONNRESET)
-        {
-            std::cerr << COLOR_RED << "[Client] Error: Connection lost while sending estimation."
-                      << COLOR_RESET << std::endl;
-            close(sock_fd);
-            exit(1); // NOPE
-        }
-        else
-        {
-            perror("Error sending estimation");
-            close(sock_fd);
-            exit(1); //NOPE
-        }
-    }
-    else if (bytes_sent == 0)
-    {
-        std::cerr << COLOR_YELLOW << "[Client] Warning: No data was sent." << COLOR_RESET << std::endl;
-        close(sock_fd);
-        exit(1); //Nope
-    }
-    else
-    {
-        msg_sent++;
-        std::cout << COLOR_GREEN << "[Client] Position [" << msg_sent << "] estimation sent.\n"
-                  << COLOR_RESET << std::endl;
-    }
+    sendto(sock_fd, estimation.c_str(), estimation.length(), MSG_CONFIRM,
+           reinterpret_cast<const struct sockaddr *>(&servaddr), sizeof(servaddr));
+    msg_sent++;
+    std::cout << COLOR_GREEN << "[Client] Position [" << msg_sent << "] estimation sent.\n"
+              << COLOR_RESET << std::endl;
 }
