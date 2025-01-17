@@ -2,6 +2,8 @@
 sources = [
   'main.cpp',
   'UDPClient.cpp',
+  'Parser.cpp',
+  'KalmanMatrices.cpp',
   'Kalman.cpp',
 ]
 

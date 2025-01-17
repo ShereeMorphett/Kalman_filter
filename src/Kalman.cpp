@@ -165,27 +165,8 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
                                                   MeasurementVector(12)
 {
     client.send_handshake(handshake);
-
-    socklen_t len = client.get_sock_len();
-    sockaddr_in servaddr = client.get_servaddr();
-    std::string str_buffer = "";
     int sock_fd = client.get_sock_fd();
-    std::cout << "SOCKET" << sock_fd << std::endl;
-
-    while (str_buffer.find("MSG_END") == std::string::npos)
-    {
-        int buff_len = recvfrom(sock_fd, buffer, MAXLINE, MSG_WAITALL,
-                                reinterpret_cast<struct sockaddr *>(&servaddr), &len);
-        if (buff_len < 0)
-        {
-            std::cerr << "Error receiving message" << std::endl;
-            exit(1); // NOPE
-        }
-        buffer[buff_len] = '\0';
-        str_buffer = static_cast<std::string>(buffer);
-        MeasurementData data = parse_data(str_buffer);
-        process_data(data);
-    }
+    parser.read_data(sock_fd);
 
     set_state_vector();
     set_state_transition_matrix();

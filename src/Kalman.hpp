@@ -1,7 +1,21 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   Kalman.hpp                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: dorian <dorian@student.42.fr>              +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/01/16 18:34:12 by dorian            #+#    #+#             */
+/*   Updated: 2025/01/16 19:51:10 by dorian           ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #pragma once
 #include <string>
 #include <vector>
 #include "UDPClient.hpp"
+#include "types.hpp"
+#include "Parser.hpp"
 #include <Eigen/Dense>
 #include <chrono>
 
