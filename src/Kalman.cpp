@@ -86,56 +86,28 @@ void Kalman::filter_loop()
     FD_ZERO(&sock_fds);
     FD_SET(sock_fd, &sock_fds);
 
-    MeasurementData data;
-    double dt = 0.01;
-
-    char buffer[MAXLINE];
-    int buff_len;
-
-    client.send_estimation(true_position); // todo: this needs to be done better
+    predict();
+    send_result();
 
     while (true)
     {
         timeout.tv_sec = timeout_duration_sec;
         timeout.tv_usec = 0;
 
+        // Given the way the imu simulator works, we don't need  select/ non-blocking socket reading. we could just do the prediction 300 times and
+        // and then process the data coming in after with the position
         int activity = select(sock_fd + 1, &sock_fds, nullptr, nullptr, &timeout);
 
         if (activity > 0) // Activity detected
         {
-            std::string accumulated_message;
-            bool end_message_received = false;
-
-            while (!end_message_received)
-            {
-                buff_len = recvfrom(sock_fd, buffer, MAXLINE, 0, NULL, NULL);
-                if (buff_len < 0)
-                {
-                    std::cerr << "Error receiving message." << std::endl;
-                    close(sock_fd);
-                    return;
-                }
-
-                buffer[buff_len] = '\0';
-                std::string str_buffer = buffer; // STATIC CAST OR SOMETHING
-
-                accumulated_message += str_buffer;
-
-                // Check for MSG_END in the received buffer
-                if (str_buffer.find("MSG_END") != std::string::npos)
-                {
-                    end_message_received = true;
-                }
-            }
-
-            // Process the accumulated message
-            data = parse_data(accumulated_message.c_str());
-            update_state_transition_matrix(dt, data);
+            parser.read_data(sock_fd);
+            set_control_input_vector(parser);
             predict();
-            update(); // todo: crashing here
-
-            set_measurement_vector(data);
-            last_activity = time(nullptr);
+            if (parser.position_set)
+            {
+                update();
+            }
+            send_result();
         }
         else if (activity == 0) // Timeout occurred
         {
