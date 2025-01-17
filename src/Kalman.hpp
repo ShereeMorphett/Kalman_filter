@@ -4,9 +4,6 @@
 #include "UDPClient.hpp"
 #include <Eigen/Dense>
 #include <chrono>
-#include <map>
-
-inline constexpr int MAXLINE = 1024;
 
 class Kalman
 {
@@ -53,11 +50,13 @@ private:
 
     double get_dt();
     void set_state_transition_matrix();
-    void update_state_transition_matrix(double dt, MeasurementData data);
+    void set_control_input_matrix();
     void set_process_error_matrix();
-    Eigen::MatrixXd get_body_to_inertial_rotation(Eigen::Vector3d angles);
-    void set_measurement_vector(MeasurementData& data);
+    void set_error_covariance_matrix();
     void set_measurement_to_state_matrix();
+    void set_measurement_noise_matrix();
+    void set_control_input_vector(Parser const &parser);
+    Eigen::MatrixXd get_body_to_inertial_rotation();
 
     void predict();
     void update();
