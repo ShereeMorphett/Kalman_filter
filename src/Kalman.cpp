@@ -29,21 +29,21 @@ void Kalman::update()
     InnovationCov = InnovationCov * measurement_to_state_matrix.transpose();
     InnovationCov = InnovationCov + measurement_noise_matrix;
 
-    Eigen::MatrixXd KalmanGain = ErrorCovarianceMatrix * MeasurementNoiseMatrix.transpose() * InnovationCov.inverse();
+    Eigen::MatrixXd KalmanGain = error_covariance_matrix * measurement_noise_matrix.transpose() * InnovationCov.inverse();
 
-    StateVector = (Eigen::MatrixXd::Identity(12, 12) - KalmanGain * MeasurementToStateMatrix) * StateVector + KalmanGain * MeasurementVector;
-    ErrorCovarianceMatrix = (Eigen::MatrixXd::Identity(12, 12) - KalmanGain * MeasurementToStateMatrix) * ErrorCovarianceMatrix;
+    state_vector = (Eigen::MatrixXd::Identity(6, 6) - KalmanGain * measurement_to_state_matrix) * state_vector + KalmanGain * measurement_vector;
+    error_covariance_matrix = (Eigen::MatrixXd::Identity(6, 6) - KalmanGain * measurement_to_state_matrix) * error_covariance_matrix;
 }
 
 void Kalman::predict()
 {
-    // Predict state: X = F * X
-    StateVector = StateTransitionMatrix * StateVector;
-    // std::cout << "STATE VECTOR: " << StateVector << std::endl;
+    // Predict state: X = F * X + B * u
+    state_vector = state_transition_matrix * state_vector + control_input_matrix * measurement_vector;
+    // std::cout << "STATE VECTOR: " << state_vector << std::endl;
     // std::cout << "----------------------------------------" << std::endl;
-    // std::cout << std::setprecision(5) << StateTransitionMatrix << std::endl;
+    // std::cout << std::setprecision(5) << state_transition_matrix << std::endl;
     // Predict covariance: P = F * P * F^T + Q
-    ErrorCovarianceMatrix = StateTransitionMatrix * ErrorCovarianceMatrix * StateTransitionMatrix.transpose() + ProcessErrorMatrix; // * dt;
+    error_covariance_matrix = state_transition_matrix * error_covariance_matrix * state_transition_matrix.transpose() + process_error_matrix; // * dt;
 }
 
 void Kalman::send_result()
@@ -51,9 +51,10 @@ void Kalman::send_result()
 
     std::stringstream ss;
     ss << std::fixed << std::setprecision(15)
-       << StateVector(0) << " " << StateVector(1) << " " << StateVector(2);
+       << state_vector(0) << " " << state_vector(1) << " " << state_vector(2);
     std::string estimation = ss.str();
-    std::cout << std::fixed << std::setprecision(15) << "ESTIMATION SENT:  " << estimation << std::endl;
+
+    parser.print_data("ESTIMATION", state_vector.segment<3>(0));
 
     client.send_estimation(estimation);
 }
@@ -156,13 +157,16 @@ void Kalman::filter_loop()
 }
 
 Kalman::Kalman(int port, std::string handshake) : client(port),
-                                                  StateVector(12),
-                                                  StateTransitionMatrix(12, 12),
-                                                  ProcessErrorMatrix(12, 12),
-                                                  MeasurementNoiseMatrix(12, 12),
-                                                  MeasurementToStateMatrix(12, 3),
-                                                  ErrorCovarianceMatrix(12, 12),
-                                                  MeasurementVector(12)
+                                                  parser(),
+                                                  state_vector(6),
+                                                  state_transition_matrix(6, 6),
+                                                  error_covariance_matrix(6, 6),
+                                                  process_error_matrix(6, 6),
+                                                  control_input_matrix(6, 6),
+                                                  control_input_vector(6),
+                                                  measurement_to_state_matrix(6, 3),
+                                                  measurement_vector(6),
+                                                  measurement_noise_matrix(6, 6)
 {
     client.send_handshake(handshake);
     int sock_fd = client.get_sock_fd();
