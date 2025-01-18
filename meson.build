@@ -27,5 +27,12 @@ add_project_arguments('-std=c++17', language: 'cpp')
 # Set up the eigen dependency
 eigen_dependency = dependency('eigen', fallback: ['eigen', 'eigen_dep'])
 
+# Get dependencies from subprojects
+imgui = subproject('imgui')
+implot = subproject('implot')
+
+imgui_dep = imgui.get_variable('imgui_dep')
+implot_dep = implot.get_variable('implot_dep')
+
 # Include the source directory
 subdir('src')
