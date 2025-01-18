@@ -18,7 +18,7 @@ endif
 
 executable('kalman',
   sources,
-  dependencies: [eigen_dependency, imgui_dep, implot_dep],
+  dependencies: [eigen_dependency, imgui_dep, implot_dep, sdl2_dependency],
   link_args: link_args,
   install: true
 )

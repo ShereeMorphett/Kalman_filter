@@ -18,6 +18,10 @@
 #include "Parser.hpp"
 #include <Eigen/Dense>
 #include <chrono>
+#include "SDL.h"
+#include "imgui.h"
+#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdlrenderer2.h" //TODO: subprojectsin <> or in ""
 
 class Kalman
 {
@@ -54,7 +58,8 @@ private:
     void send_result();
 
 public:
-    void filter_loop();
+    void render_loop(SDL_Window *window, SDL_Renderer *renderer);
+    bool filter_loop();
     Kalman(int port = 8080, std::string handshake = "READY");
     ~Kalman();
 };

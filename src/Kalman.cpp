@@ -74,7 +74,55 @@ void Kalman::send_result()
           modularly, this whole thing could be more flexible for whatever future use.
 */
 
-void Kalman::filter_loop()
+void Kalman::render_loop(SDL_Window *window, SDL_Renderer *renderer)
+{
+    bool running = true;
+    while (running)
+    {
+        SDL_Event event;
+        while (SDL_PollEvent(&event))
+        {
+            if (event.type == SDL_QUIT)
+            {
+                std::cout << "Exit window event called. Closing the program" << std::endl;
+                running = false;
+                return;
+            }
+        }
+
+        ImGui::NewFrame();
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 250);
+        SDL_RenderClear(renderer);
+
+        bool check_kal = filter_loop();
+        std::cout << "filter_loop returned: " << check_kal << std::endl;
+        ImGui::SetNextWindowPos(ImVec2(100, 100));
+        ImGui::SetNextWindowSize(ImVec2(300, 100));
+        // check_kal = true;
+        if (!check_kal)
+        {
+            std::cout << "Rendering error window" << std::endl;
+            ImGui::Begin("Error");
+            ImGui::Text("Kalman filter has encountered an issue.");
+            ImGui::End();
+            running = false;
+        }
+        else
+        {
+            ImGui::Begin("Kalman_filter");
+            ImGui::Text("Kalman filter is fine, plot some stuff here.");
+            ImGui::End();
+        }
+
+        ImGui::Render();
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+        SDL_RenderPresent(renderer);
+
+        SDL_Delay(2000);
+    }
+}
+
+bool Kalman::filter_loop()
 {
     int sock_fd = client.get_sock_fd();
     struct timeval timeout;
@@ -94,11 +142,9 @@ void Kalman::filter_loop()
         timeout.tv_sec = timeout_duration_sec;
         timeout.tv_usec = 0;
 
-        // Given the way the imu simulator works, we don't need  select/ non-blocking socket reading. we could just do the prediction 300 times and
-        // and then process the data coming in after with the position
         int activity = select(sock_fd + 1, &sock_fds, nullptr, nullptr, &timeout);
 
-        if (activity > 0) // Activity detected
+        if (activity > 0)
         {
             parser.read_data(sock_fd);
             set_control_input_vector(parser);
@@ -116,16 +162,17 @@ void Kalman::filter_loop()
             {
                 std::cout << "Client disconnected due to inactivity." << std::endl;
                 close(sock_fd);
-                return;
+                return false;
             }
         }
         else // Error occurred
         {
             std::cerr << "Error with select()." << std::endl;
             close(sock_fd);
-            return;
+            return false;
         }
     }
+    return true;
 }
 
 Kalman::Kalman(int port, std::string handshake) : client(port),
