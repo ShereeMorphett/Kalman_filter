@@ -18,6 +18,8 @@
 #include "Parser.hpp"
 #include <Eigen/Dense>
 #include <chrono>
+#include <mutex>
+
 #include "SDL.h"
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -32,6 +34,11 @@ private:
     const double variance_accelerometer = 1e-9; // 1e-3 * 1e-3
     const double variance_gyroscope = 1e-4;     // 1e-2 * 1e-2
     const double variance_gps = 1e-2;           // 1e-1 * 1e-1
+
+    // std::atomic<bool> filter_running;
+    std::atomic<bool> kalman_error;
+    std::mutex sent_predictions_mutex;
+    int sent_predictions; // THIS SERVES DO PURPOSE BUT PLOTTING ON GRAPHS
 
     Eigen::VectorXd state_vector;                // State vector (position, velocity) X(0): Position x. X(1): Position y.  X(2): Position  z. X(3): Velocity  x. X(4): Velocity  y.  X(5): Velocity  z.  -
     Eigen::MatrixXd state_transition_matrix;     // State transition matrix  -
@@ -59,6 +66,8 @@ private:
 
 public:
     void render_loop(SDL_Window *window, SDL_Renderer *renderer);
+    int get_sent_predictions();
+    bool get_kalman_error();
     bool filter_loop();
     Kalman(int port = 8080, std::string handshake = "READY");
     ~Kalman();

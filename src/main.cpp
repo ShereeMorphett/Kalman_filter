@@ -5,8 +5,15 @@
 #include "Kalman.hpp"
 #include "SDL.h"
 #include "imgui.h"
+#include "implot.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h" //TODO: subprojectsin <> or in ""
+#include "colour.hpp"
+
+#include <mutex>
+#include <atomic>
+#include <thread>
+
 /*
 OPTIONS:
     -a, --accsig <acceleration_sigma>
@@ -47,10 +54,13 @@ OPTIONS:
             Print version information
 */
 
+std::mutex get_predictions_mutex;
+
 void setup_imgui_context(SDL_Window *sdl_window, SDL_Renderer *sdl_renderer)
 {
 
         ImGui::CreateContext();
+        ImPlot::CreateContext();
 
         ImGuiIO &io = ImGui::GetIO();
         (void)io;
@@ -71,51 +81,85 @@ void setup_imgui_context(SDL_Window *sdl_window, SDL_Renderer *sdl_renderer)
         ImGui_ImplSDL2_NewFrame();
 }
 
-// void render_loop(SDL_Window *window, SDL_Renderer *renderer, Kalman &kalman_filter)
-// {
-//         bool running = true;
-//         while (running)
-//         {
-//                 SDL_Event event;
-//                 while (SDL_PollEvent(&event))
-//                 {
-//                         if (event.type == SDL_QUIT)
-//                         {
-//                                 std::cout << "Exit window event called. Closing the program" << std::endl;
-//                                 running = false;
-//                         }
-//                 }
+void render_loop(SDL_Window *window, SDL_Renderer *renderer, Kalman &kalman_filter)
+{
+        bool running = true;
+        float value;
+        std::vector<float> x_data;
+        std::vector<float> y_data;
+        y_data.push_back(0);
+        x_data.push_back(y_data.size());
 
-//                 // Initialize the new frame for ImGui
-//                 ImGui::NewFrame();
+        while (running)
+        {
+                SDL_Event event;
+                while (SDL_PollEvent(&event))
+                {
+                        if (event.type == SDL_QUIT)
+                        {
+                                std::cout << "Exit window event called. Closing the program" << std::endl;
+                                running = false;
+                                return;
+                        }
+                }
 
-//                 SDL_SetRenderDrawColor(renderer, 255, 255, 255, 250);
-//                 SDL_RenderClear(renderer);
+                ImGui::NewFrame();
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 250);
+                SDL_RenderClear(renderer);
 
-//                 ImGui::Begin("My Window");
-//                 ImGui::Text("Color");
-//                 ImGui::End();
+                ImGui::SetNextWindowPos(ImVec2(5, 5));
+                ImGui::SetNextWindowSize(ImVec2(650, 450));
 
-//                 bool check_kal = kalman_filter.filter_loop();
-//                 check_kal = true;
-//                 if (!check_kal)
-//                 {
-//                         ImGui::Begin("Error");
-//                         ImGui::Text("Kalman filter has encountered an issue. Pausing...");
-//                         ImGui::End();
-//                 }
+                get_predictions_mutex.lock();
+                value = kalman_filter.get_sent_predictions();
+                get_predictions_mutex.unlock();
+                if (value != y_data[y_data.size()])
+                {
+                        y_data.push_back(kalman_filter.get_sent_predictions());
+                        x_data.push_back(y_data.size());
+                }
 
-//                 ImGui::Render();
-//                 ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+                if (kalman_filter.get_kalman_error())
+                {
+                        std::cout << "Rendering error window" << std::endl;
 
-//                 SDL_RenderPresent(renderer);
-//                 if (!check_kal)
-//                 {
-//                         SDL_Delay(2000);
-//                         return;
-//                 }
-//         }
-// }
+                        ImGui::Begin("Kalman_filter");
+
+                        ImPlot::SetNextAxesLimits(0, 200, 0, 200, ImPlotCond_Always);
+
+                        if (ImPlot::BeginPlot("Live Plot"))
+                        {
+                                ImPlot::PlotScatter("My Line Plot", x_data.data(), y_data.data(), y_data.size());
+                                ImPlot::EndPlot();
+                        }
+                        ImGui::End();
+                        running = false;
+                }
+                else
+                {
+
+                        ImGui::Begin("Kalman_filter");
+
+                        ImPlot::SetNextAxesLimits(0, 200, 0, 200, ImPlotCond_Always);
+
+                        if (ImPlot::BeginPlot("Live Plot"))
+                        {
+
+                                ImPlot::PlotScatter("My Line Plot", x_data.data(), y_data.data(), y_data.size());
+                                ImPlot::EndPlot();
+                        }
+
+                        ImGui::Text("Kalman filter is fine, plotting live data.");
+                        ImGui::End();
+                }
+
+                ImGui::Render();
+                ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+                SDL_RenderPresent(renderer);
+        }
+        SDL_Delay(2000);
+        std::cout << COLOR_RED << y_data.size() << COLOR_RESET << std::endl;
+}
 
 int main()
 {
@@ -151,8 +195,14 @@ int main()
 
                 setup_imgui_context(window, renderer);
 
-                kalman_filter.render_loop(window, renderer);
+                std::thread filter_thread([&]()
+                                          { kalman_filter.filter_loop(); });
 
+                render_loop(window, renderer, kalman_filter);
+
+                filter_thread.join();
+                ImGui::DestroyContext();
+                ImPlot::DestroyContext();
                 SDL_DestroyRenderer(renderer);
                 SDL_DestroyWindow(window);
                 SDL_Quit();

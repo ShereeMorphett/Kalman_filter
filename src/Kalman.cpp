@@ -55,7 +55,9 @@ void Kalman::send_result()
     std::string estimation = ss.str();
 
     parser.print_data("ESTIMATION", state_vector.segment<3>(0));
-
+    sent_predictions_mutex.lock();
+    sent_predictions++;
+    sent_predictions_mutex.unlock(); // this is now counting loops not predictions for thread testing
     client.send_estimation(estimation);
 }
 
@@ -73,54 +75,6 @@ void Kalman::send_result()
         x I don't think we need the control input matrix. We could keep it in and set it to 0. If we do the initiailisation more
           modularly, this whole thing could be more flexible for whatever future use.
 */
-
-void Kalman::render_loop(SDL_Window *window, SDL_Renderer *renderer)
-{
-    bool running = true;
-    while (running)
-    {
-        SDL_Event event;
-        while (SDL_PollEvent(&event))
-        {
-            if (event.type == SDL_QUIT)
-            {
-                std::cout << "Exit window event called. Closing the program" << std::endl;
-                running = false;
-                return;
-            }
-        }
-
-        ImGui::NewFrame();
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 250);
-        SDL_RenderClear(renderer);
-
-        bool check_kal = filter_loop();
-        std::cout << "filter_loop returned: " << check_kal << std::endl;
-        ImGui::SetNextWindowPos(ImVec2(100, 100));
-        ImGui::SetNextWindowSize(ImVec2(300, 100));
-        // check_kal = true;
-        if (!check_kal)
-        {
-            std::cout << "Rendering error window" << std::endl;
-            ImGui::Begin("Error");
-            ImGui::Text("Kalman filter has encountered an issue.");
-            ImGui::End();
-            running = false;
-        }
-        else
-        {
-            ImGui::Begin("Kalman_filter");
-            ImGui::Text("Kalman filter is fine, plot some stuff here.");
-            ImGui::End();
-        }
-
-        ImGui::Render();
-        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
-        SDL_RenderPresent(renderer);
-
-        SDL_Delay(2000);
-    }
-}
 
 bool Kalman::filter_loop()
 {
@@ -155,24 +109,35 @@ bool Kalman::filter_loop()
             }
             send_result();
         }
-        else if (activity == 0) // Timeout occurred
+        else if (activity == 0)
         {
             time_t current_time = time(nullptr);
             if (current_time - last_activity >= timeout_duration_sec)
             {
                 std::cout << "Client disconnected due to inactivity." << std::endl;
                 close(sock_fd);
+                kalman_error = true;
                 return false;
             }
         }
-        else // Error occurred
+        else
         {
             std::cerr << "Error with select()." << std::endl;
             close(sock_fd);
+            kalman_error = true;
             return false;
         }
     }
     return true;
+}
+int Kalman::get_sent_predictions()
+{
+    return sent_predictions;
+};
+
+bool Kalman::get_kalman_error()
+{
+    return kalman_error;
 }
 
 Kalman::Kalman(int port, std::string handshake) : client(port),
@@ -190,7 +155,7 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
     client.send_handshake(handshake);
     int sock_fd = client.get_sock_fd();
     parser.read_data(sock_fd);
-
+    sent_predictions = 0;
     set_state_vector();
     set_state_transition_matrix();
     set_control_input_matrix();
@@ -198,7 +163,7 @@ Kalman::Kalman(int port, std::string handshake) : client(port),
     set_process_error_matrix();
     set_measurement_to_state_matrix();
     set_measurement_noise_matrix();
-
+    kalman_error = false;
     measurement_vector.setZero();
     measurement_vector.segment<3>(0) = Eigen::Vector3d({1, 1, 1});
 }
